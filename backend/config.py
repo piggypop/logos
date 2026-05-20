@@ -9,8 +9,12 @@ _LEGACY_PATH = Path.home() / ".config" / "chat_app" / "config.json"
 DEFAULTS = {
     "ollama_host": "http://localhost:11434",
     "ollama_model": "qwen3:8b",
+    "search_provider": "ddg",
+    "search_results_count": 5,
     "searxng_url": "http://localhost:8081",
-    "searxng_results_count": 5,
+    "brave_api_key": "",
+    "ddg_safesearch": "moderate",
+    "ddg_region": "wt-wt",
     "auto_search_enabled": True,
     "system_prompt": "You are a helpful assistant. Answer in the same language the user writes in.",
     "search_system_prompt": (
@@ -24,6 +28,22 @@ DEFAULTS = {
     "temperature": 0.7,
     "port": 17842,
     "user_location": "",
+    "open_notebook_url": "http://localhost:5055",
+    "open_notebook_ui_url": "http://localhost:8502",
+    "active_notebook_id": "",
+    "active_notebook_name": "",
+    "comfyui_url": "http://localhost:8188",
+    "comfyui_workflow": "sdxl-default",
+    "comfyui_custom_workflow": "",
+    "comfyui_checkpoint": "",
+    "comfyui_steps": 30,
+    "comfyui_cfg": 7.5,
+    "comfyui_sampler": "euler",
+    "comfyui_scheduler": "normal",
+    "comfyui_width": 1024,
+    "comfyui_height": 1024,
+    "comfyui_negative_prompt": "blurry, low quality, watermark, text, signature",
+    "comfyui_post_commentary": True,
 }
 
 
@@ -40,6 +60,9 @@ def load() -> dict:
     if CONFIG_PATH.exists():
         with open(CONFIG_PATH) as f:
             data = json.load(f)
+        # one-time field rename
+        if "searxng_results_count" in data and "search_results_count" not in data:
+            data["search_results_count"] = data.pop("searxng_results_count")
         return {**DEFAULTS, **data}
     return DEFAULTS.copy()
 

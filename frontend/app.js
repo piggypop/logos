@@ -5,6 +5,7 @@ let isStreaming = false;
 let currentConfig = {};
 let currentChatId = null;
 let pendingAttachments = [];   // staged for next send
+let forceSearchMode = false;   // 🔍 toggle
 
 // ── DOM Refs ─────────────────────────────────────────────────────────────────
 const messagesEl    = document.getElementById("messages");
@@ -12,6 +13,7 @@ const userInput     = document.getElementById("user-input");
 const btnSend       = document.getElementById("btn-send");
 const btnSearch     = document.getElementById("btn-search");
 const btnAttach     = document.getElementById("btn-attach");
+const btnImage      = document.getElementById("btn-image");
 const attachmentsBar = document.getElementById("attachments-bar");
 const btnNewChat    = document.getElementById("btn-new-chat");
 const btnSettings   = document.getElementById("btn-settings");
@@ -41,6 +43,7 @@ async function init() {
   });
 
   await loadChatList();
+  probeComfyuiOnce();
 }
 
 // ── Config ───────────────────────────────────────────────────────────────────
@@ -124,6 +127,9 @@ async function streamResponse(forceSearch = false) {
 
         if (event.type === "searching") {
           showIndicator("Searching…");
+
+        } else if (event.type === "loading_notebook") {
+          showIndicator("Loading notebook…");
 
         } else if (event.type === "fetching_urls") {
           const n = (event.urls || []).length;
@@ -547,6 +553,10 @@ async function loadChat(chatId) {
       if (m.role === "user") {
         appendMessage("user", m.content, m.attachments);
       } else if (m.role === "assistant") {
+        if (m.image) {
+          renderAssistantImage(m);
+          continue;
+        }
         const bubble = createAssistantBubble();
         bubble.innerHTML = marked.parse(m.content || "");
         bubble.querySelectorAll("pre code").forEach(el => hljs.highlightElement(el));
@@ -634,10 +644,30 @@ async function openSettings() {
   const c = currentConfig;
 
   document.getElementById("s-ollama-host").value = c.ollama_host || "";
+  document.getElementById("s-search-provider").value = c.search_provider || "ddg";
+  document.getElementById("s-brave-api-key").value = c.brave_api_key || "";
   document.getElementById("s-searxng-url").value = c.searxng_url || "";
-  document.getElementById("s-results-count").value = c.searxng_results_count || 5;
+  document.getElementById("s-results-count").value = c.search_results_count || c.searxng_results_count || 5;
   document.getElementById("s-auto-search").checked = !!c.auto_search_enabled;
   document.getElementById("s-user-location").value = c.user_location || "";
+  document.getElementById("s-notebook-url").value = c.open_notebook_url || "";
+  document.getElementById("s-notebook-ui-url").value = c.open_notebook_ui_url || "";
+
+  // ComfyUI fields
+  document.getElementById("s-comfyui-url").value = c.comfyui_url || "";
+  document.getElementById("s-comfyui-workflow").value = c.comfyui_workflow || "sdxl-default";
+  document.getElementById("s-comfyui-custom-workflow").value = c.comfyui_custom_workflow || "";
+  document.getElementById("s-comfyui-steps").value = c.comfyui_steps ?? 30;
+  document.getElementById("s-comfyui-cfg").value = c.comfyui_cfg ?? 7.5;
+  document.getElementById("s-comfyui-width").value = c.comfyui_width ?? 1024;
+  document.getElementById("s-comfyui-height").value = c.comfyui_height ?? 1024;
+  document.getElementById("s-comfyui-negative").value = c.comfyui_negative_prompt || "";
+  document.getElementById("s-comfyui-commentary").checked = !!c.comfyui_post_commentary;
+  updateComfyuiCustomVisibility();
+
+  updateProviderFieldsVisibility();
+  await refreshNotebooks(c.active_notebook_id || "");
+  await refreshComfyui(c);
   document.getElementById("s-system-prompt").value = c.system_prompt || "";
   document.getElementById("s-temperature").value = c.temperature || 0.7;
   document.getElementById("s-temperature-val").textContent = c.temperature || 0.7;
@@ -648,6 +678,7 @@ async function openSettings() {
   // Load memory
   await loadMemory();
 
+  restoreSettingsTab();
   document.getElementById("settings-overlay").classList.remove("hidden");
 }
 
@@ -729,10 +760,30 @@ async function saveSettings() {
   await saveConfig({
     ollama_host: document.getElementById("s-ollama-host").value.trim(),
     ollama_model: document.getElementById("s-model").value,
+    search_provider: document.getElementById("s-search-provider").value,
+    brave_api_key: document.getElementById("s-brave-api-key").value.trim(),
     searxng_url: document.getElementById("s-searxng-url").value.trim(),
-    searxng_results_count: parseInt(document.getElementById("s-results-count").value),
+    search_results_count: parseInt(document.getElementById("s-results-count").value),
     auto_search_enabled: document.getElementById("s-auto-search").checked,
     user_location: document.getElementById("s-user-location").value.trim(),
+    open_notebook_url: document.getElementById("s-notebook-url").value.trim(),
+    open_notebook_ui_url: document.getElementById("s-notebook-ui-url").value.trim(),
+    active_notebook_id: document.getElementById("s-notebook-active").value,
+    active_notebook_name: document.getElementById("s-notebook-active").options[
+      document.getElementById("s-notebook-active").selectedIndex
+    ]?.dataset.name || "",
+    comfyui_url: document.getElementById("s-comfyui-url").value.trim(),
+    comfyui_workflow: document.getElementById("s-comfyui-workflow").value,
+    comfyui_custom_workflow: document.getElementById("s-comfyui-custom-workflow").value,
+    comfyui_checkpoint: document.getElementById("s-comfyui-checkpoint").value,
+    comfyui_sampler: document.getElementById("s-comfyui-sampler").value,
+    comfyui_scheduler: document.getElementById("s-comfyui-scheduler").value,
+    comfyui_steps: parseInt(document.getElementById("s-comfyui-steps").value) || 30,
+    comfyui_cfg: parseFloat(document.getElementById("s-comfyui-cfg").value) || 7.5,
+    comfyui_width: parseInt(document.getElementById("s-comfyui-width").value) || 1024,
+    comfyui_height: parseInt(document.getElementById("s-comfyui-height").value) || 1024,
+    comfyui_negative_prompt: document.getElementById("s-comfyui-negative").value,
+    comfyui_post_commentary: document.getElementById("s-comfyui-commentary").checked,
     system_prompt: document.getElementById("s-system-prompt").value,
     temperature: temp
   });
@@ -740,9 +791,29 @@ async function saveSettings() {
 }
 
 // ── Event Listeners ───────────────────────────────────────────────────────────
-btnSend.addEventListener("click", () => sendMessage(false));
-btnSearch.addEventListener("click", () => sendMessage(true));
+btnSend.addEventListener("click", () => sendMessage(forceSearchMode));
+btnSearch.addEventListener("click", toggleForceSearch);
 btnAttach.addEventListener("click", pickAttachments);
+btnImage.addEventListener("click", openImageModal);
+
+document.getElementById("image-close").addEventListener("click", closeImageModal);
+document.getElementById("img-cancel").addEventListener("click", closeImageModal);
+document.getElementById("img-generate").addEventListener("click", generateImage);
+
+document.getElementById("s-comfyui-workflow").addEventListener("change", updateComfyuiCustomVisibility);
+document.getElementById("s-comfyui-connect").addEventListener("click", async () => {
+  await saveConfig({comfyui_url: document.getElementById("s-comfyui-url").value.trim()});
+  await refreshComfyui(currentConfig, {force: true});
+  await probeComfyuiOnce();
+});
+
+function toggleForceSearch() {
+  forceSearchMode = !forceSearchMode;
+  btnSearch.classList.toggle("active", forceSearchMode);
+  btnSearch.title = forceSearchMode
+    ? "Force web search: ON (click to disable)"
+    : "Force web search: OFF (click to enable)";
+}
 btnNewChat.addEventListener("click", newChat);
 btnSettings.addEventListener("click", openSettings);
 btnSidebarToggle.addEventListener("click", toggleSidebar);
@@ -758,6 +829,399 @@ document.getElementById("s-refresh-models").addEventListener("click", () => {
 
 document.getElementById("s-memory-refresh").addEventListener("click", loadMemory);
 
+document.getElementById("s-search-provider").addEventListener("change", updateProviderFieldsVisibility);
+
+// ── Notebook (Open Notebook) ─────────────────────────────────────────────
+document.getElementById("s-notebook-connect").addEventListener("click", async () => {
+  // Persist URL before testing
+  const url = document.getElementById("s-notebook-url").value.trim();
+  await saveConfig({open_notebook_url: url});
+  await refreshNotebooks(document.getElementById("s-notebook-active").value);
+});
+
+document.getElementById("s-notebook-refresh").addEventListener("click", async () => {
+  await fetch(`${API}/api/notebooks/refresh`, {method: "POST"});
+  const id = document.getElementById("s-notebook-active").value;
+  await renderNotebookPreview(id);
+});
+
+document.getElementById("s-notebook-active").addEventListener("change", async () => {
+  const sel = document.getElementById("s-notebook-active");
+  const id = sel.value;
+  const name = sel.options[sel.selectedIndex]?.dataset.name || "";
+  await saveConfig({active_notebook_id: id, active_notebook_name: name});
+  await renderNotebookPreview(id);
+});
+
+async function refreshNotebooks(selectedId) {
+  const sel = document.getElementById("s-notebook-active");
+  const status = document.getElementById("s-notebook-status");
+  const info = document.getElementById("s-notebook-info");
+  try {
+    const r = await fetch(`${API}/api/notebooks`);
+    const data = await r.json();
+    sel.innerHTML = '<option value="">— None (notebook integration off) —</option>';
+    if (!data.ok) {
+      status.textContent = "not reachable";
+      status.style.color = "var(--error)";
+      info.textContent = "";
+      return;
+    }
+    status.textContent = `connected · ${data.notebooks.length} notebook${data.notebooks.length === 1 ? "" : "s"}`;
+    status.style.color = "var(--accent)";
+    for (const nb of data.notebooks) {
+      const opt = document.createElement("option");
+      opt.value = nb.id;
+      opt.dataset.name = nb.name || "";
+      const counts = `${nb.source_count || 0} src · ${nb.note_count || 0} notes`;
+      opt.textContent = `${nb.name || "(untitled)"}  ·  ${counts}`;
+      if (nb.id === selectedId) opt.selected = true;
+      sel.appendChild(opt);
+    }
+    await renderNotebookPreview(sel.value);
+  } catch (e) {
+    status.textContent = "error";
+    status.style.color = "var(--error)";
+    info.textContent = String(e.message || e);
+  }
+}
+
+// ── ComfyUI ──────────────────────────────────────────────────────────────────
+function updateComfyuiCustomVisibility() {
+  const v = document.getElementById("s-comfyui-workflow").value;
+  document.getElementById("s-comfyui-custom-wrap").classList.toggle("hidden", v !== "custom");
+}
+
+function fillSelect(el, options, selected) {
+  el.innerHTML = "";
+  if (!options || !options.length) {
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.textContent = "— none found —";
+    el.appendChild(opt);
+    return;
+  }
+  for (const o of options) {
+    const opt = document.createElement("option");
+    opt.value = o;
+    opt.textContent = o;
+    if (o === selected) opt.selected = true;
+    el.appendChild(opt);
+  }
+  if (!options.includes(selected) && selected) {
+    const opt = document.createElement("option");
+    opt.value = selected;
+    opt.textContent = `${selected} (not on server)`;
+    opt.selected = true;
+    el.insertBefore(opt, el.firstChild);
+  }
+}
+
+async function refreshComfyui(c, {force = false} = {}) {
+  const status = document.getElementById("s-comfyui-status");
+  const ckptSel = document.getElementById("s-comfyui-checkpoint");
+  const samplerSel = document.getElementById("s-comfyui-sampler");
+  const schedSel = document.getElementById("s-comfyui-scheduler");
+  status.textContent = "checking…";
+  status.style.color = "var(--muted)";
+  try {
+    const r = await fetch(`${API}/api/comfyui/status${force ? "?refresh=1" : ""}`);
+    const data = await r.json();
+    if (!data.ok) {
+      status.textContent = data.error || "unreachable";
+      status.style.color = "var(--error)";
+      fillSelect(ckptSel, [], c.comfyui_checkpoint);
+      fillSelect(samplerSel, ["euler","euler_ancestral","dpmpp_2m","dpmpp_sde"], c.comfyui_sampler);
+      fillSelect(schedSel, ["normal","karras","exponential","sgm_uniform"], c.comfyui_scheduler);
+      btnImage.disabled = true;
+      return;
+    }
+    status.textContent = `connected · ${data.checkpoints.length} checkpoints`;
+    status.style.color = "var(--accent)";
+    fillSelect(ckptSel, data.checkpoints, c.comfyui_checkpoint);
+    fillSelect(samplerSel, data.samplers, c.comfyui_sampler);
+    fillSelect(schedSel, data.schedulers, c.comfyui_scheduler);
+    btnImage.disabled = false;
+  } catch (e) {
+    status.textContent = "error: " + (e.message || e);
+    status.style.color = "var(--error)";
+    btnImage.disabled = true;
+  }
+}
+
+// Check ComfyUI reachability once on init (so button enables/disables on first paint)
+async function probeComfyuiOnce() {
+  try {
+    const r = await fetch(`${API}/api/comfyui/status`);
+    const data = await r.json();
+    btnImage.disabled = !data.ok;
+    if (!data.ok) btnImage.title = "ComfyUI unreachable (check Settings → Image)";
+    else btnImage.title = "Generate image (ComfyUI)";
+  } catch (e) {
+    btnImage.disabled = true;
+  }
+}
+
+// Image generation modal
+const imgOverlay  = document.getElementById("image-overlay");
+const imgPrompt   = document.getElementById("img-prompt");
+const imgNegative = document.getElementById("img-negative");
+const imgProgress = document.getElementById("img-progress");
+const imgGenerate = document.getElementById("img-generate");
+let imgGenerating = false;
+
+function openImageModal() {
+  if (isStreaming || btnImage.disabled) return;
+  imgPrompt.value = userInput.value.trim();  // pre-fill with current input if any
+  imgNegative.value = "";
+  imgProgress.textContent = "";
+  imgGenerating = false;
+  imgGenerate.disabled = false;
+  imgOverlay.classList.remove("hidden");
+  imgPrompt.focus();
+}
+
+function closeImageModal() {
+  if (imgGenerating) return;  // don't close mid-generation
+  imgOverlay.classList.add("hidden");
+}
+
+async function generateImage() {
+  const prompt = imgPrompt.value.trim();
+  if (!prompt || imgGenerating) return;
+  imgGenerating = true;
+  imgGenerate.disabled = true;
+  imgProgress.textContent = "queued…";
+  // Pin the chat context at submit time so a mid-generation New Chat / chat
+  // switch doesn't cause the image to land in the wrong conversation.
+  const chatIdAtStart = currentChatId;
+  let imageResult = null;
+  try {
+    const body = {prompt, chat_id: chatIdAtStart, overrides: {}};
+    const neg = imgNegative.value.trim();
+    if (neg) body.overrides.negative = neg;
+    const resp = await fetch(`${API}/api/comfyui/generate`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(body),
+    });
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let buf = "";
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, {stream: true});
+      const lines = buf.split("\n");
+      buf = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        let ev;
+        try { ev = JSON.parse(line.slice(6)); } catch { continue; }
+        if (ev.type === "queued") {
+          imgProgress.textContent = "queued · waiting for worker…";
+        } else if (ev.type === "progress") {
+          imgProgress.textContent = `step ${ev.value}/${ev.max}`;
+        } else if (ev.type === "image") {
+          imageResult = ev;
+        } else if (ev.type === "error") {
+          imgProgress.textContent = "✗ " + ev.message;
+          imgGenerating = false;
+          imgGenerate.disabled = false;
+          return;
+        }
+      }
+    }
+    if (imageResult) {
+      imgOverlay.classList.add("hidden");
+      await onImageGenerated(imageResult, chatIdAtStart);
+    } else {
+      imgProgress.textContent = "✗ no image returned";
+    }
+  } catch (e) {
+    imgProgress.textContent = "✗ " + (e.message || e);
+  } finally {
+    imgGenerating = false;
+    imgGenerate.disabled = false;
+  }
+}
+
+function relativeImagePath(absPath) {
+  // /home/X/.local/share/logos/images/<chat_id>/<file> → <chat_id>/<file>
+  const m = absPath.match(/\/logos\/images\/(.+)$/);
+  return m ? m[1] : absPath;
+}
+
+async function onImageGenerated(ev, originalChatId) {
+  // Append assistant message with image. If the user navigated away from the
+  // chat that initiated this generation, persist to the original chat without
+  // touching the current UI.
+  const rel = relativeImagePath(ev.path);
+  const url = `${API}/api/images/${rel.split("/").map(encodeURIComponent).join("/")}`;
+  const msg = {
+    role: "assistant",
+    content: "",
+    image: {
+      path: ev.path,
+      url,
+      filename: ev.filename,
+      prompt: ev.prompt,
+      params: ev.params || {},
+    },
+  };
+
+  // Detect race: chat changed (or was assigned an id) since we started
+  if (originalChatId && originalChatId !== currentChatId) {
+    await persistMessageToChat(originalChatId, msg);
+    return;
+  }
+  // If the original chat had no id yet AND user has since started a different chat,
+  // discard (image file remains on disk under "scratch" folder).
+  if (!originalChatId && currentChatId) return;
+
+  conversationHistory.push(msg);
+  renderAssistantImage(msg);
+  scrollToBottom();
+  await saveCurrentChat();
+
+  if (currentConfig.comfyui_post_commentary) {
+    await runImageCommentary(msg);
+  }
+}
+
+async function persistMessageToChat(chatId, msg) {
+  try {
+    const r = await fetch(`${API}/api/chats/${chatId}`);
+    if (!r.ok) return;
+    const chat = await r.json();
+    const messages = (chat.messages || []).concat([msg]);
+    await fetch(`${API}/api/chats/${chatId}`, {
+      method: "PUT",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({messages}),
+    });
+    await loadChatList();
+  } catch (e) {
+    console.error("persistMessageToChat failed:", e);
+  }
+}
+
+function renderAssistantImage(msg) {
+  const root = document.createElement("div");
+  root.className = "msg assistant";
+  const roleLabel = document.createElement("div");
+  roleLabel.className = "msg-role";
+  roleLabel.textContent = "assistant";
+  const body = document.createElement("div");
+  body.className = "msg-body";
+
+  const wrap = document.createElement("div");
+  wrap.className = "msg-image-wrap";
+  const img = document.createElement("img");
+  img.className = "msg-image";
+  img.src = msg.image.url;
+  img.alt = msg.image.prompt || "";
+  img.onclick = () => openImageViewer(msg.image.url);
+  const meta = document.createElement("div");
+  meta.className = "msg-image-meta";
+  const p = msg.image.params || {};
+  meta.textContent = `“${msg.image.prompt}” · ${p.width}×${p.height} · ${p.steps} steps · seed ${p.seed} · ${p.checkpoint || "?"}`;
+  wrap.append(img, meta);
+  body.appendChild(wrap);
+
+  root.append(roleLabel, body);
+  if (msg.content) {
+    const text = document.createElement("div");
+    text.className = "msg-body";
+    text.innerHTML = marked.parse(msg.content);
+    root.appendChild(text);
+  }
+  messagesEl.appendChild(root);
+  attachMessageActions(root);
+  return root;
+}
+
+function openImageViewer(url) {
+  let v = document.getElementById("image-viewer");
+  if (!v) {
+    v = document.createElement("div");
+    v.id = "image-viewer";
+    v.onclick = () => v.remove();
+    const i = document.createElement("img");
+    i.src = url;
+    v.appendChild(i);
+    document.body.appendChild(v);
+  }
+}
+
+async function runImageCommentary(imageMsg) {
+  // Synthetic continuation: append a user message asking for commentary,
+  // stream response; user message removed before saving (purely meta).
+  const synthetic = {
+    role: "user",
+    content: `[I just generated an image with the prompt: "${imageMsg.image.prompt}". Briefly describe what you imagine was produced and offer any creative observations. Keep it under 80 words.]`,
+  };
+  conversationHistory.push(synthetic);
+  await streamResponse(false);
+  // Hide the synthetic prompt from history (keep assistant reply)
+  const idx = conversationHistory.indexOf(synthetic);
+  if (idx !== -1) conversationHistory.splice(idx, 1);
+  await saveCurrentChat();
+}
+
+async function renderNotebookPreview(notebookId) {
+  const info = document.getElementById("s-notebook-info");
+  const warn = document.getElementById("s-notebook-warning");
+  warn.classList.add("hidden");
+  if (!notebookId) {
+    info.textContent = "";
+    return;
+  }
+  info.textContent = "loading…";
+  try {
+    const r = await fetch(`${API}/api/notebooks/${encodeURIComponent(notebookId)}/preview`);
+    const data = await r.json();
+    if (!data.ok) {
+      info.textContent = data.error || "could not load";
+      return;
+    }
+    const t = data.total_tokens_est;
+    info.textContent = `${data.source_count} source${data.source_count === 1 ? "" : "s"} · ~${t.toLocaleString()} tokens`;
+    if (t > 50000) {
+      warn.classList.remove("hidden");
+      warn.textContent = `⚠ Large notebook (~${t.toLocaleString()} tokens). May exceed your model's context window or slow responses.`;
+    }
+  } catch (e) {
+    info.textContent = String(e.message || e);
+  }
+}
+
+function updateProviderFieldsVisibility() {
+  const provider = document.getElementById("s-search-provider").value;
+  document.getElementById("s-provider-brave").classList.toggle("hidden", provider !== "brave");
+  document.getElementById("s-provider-searxng").classList.toggle("hidden", provider !== "searxng");
+}
+
+// Settings tabs
+document.querySelectorAll(".settings-tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    const target = tab.dataset.tab;
+    document.querySelectorAll(".settings-tab").forEach(t => t.classList.toggle("active", t === tab));
+    document.querySelectorAll(".settings-tab-panel").forEach(p =>
+      p.classList.toggle("active", p.dataset.panel === target)
+    );
+    try { localStorage.setItem("logos.lastSettingsTab", target); } catch (_) {}
+  });
+});
+
+// Restore last opened tab when Settings opens
+function restoreSettingsTab() {
+  let tab = "model";
+  try { tab = localStorage.getItem("logos.lastSettingsTab") || "model"; } catch (_) {}
+  const btn = document.querySelector(`.settings-tab[data-tab="${tab}"]`);
+  if (btn) btn.click();
+}
+
 document.getElementById("s-temperature").addEventListener("input", function() {
   document.getElementById("s-temperature-val").textContent = this.value;
 });
@@ -765,7 +1229,7 @@ document.getElementById("s-temperature").addEventListener("input", function() {
 userInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) {
     e.preventDefault();
-    sendMessage(false);
+    sendMessage(forceSearchMode);
   }
 });
 

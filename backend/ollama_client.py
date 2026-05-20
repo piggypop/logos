@@ -1,16 +1,27 @@
 import sys
 
+import httpx
 import ollama as ol
+
+# Short timeouts for non-streaming calls so the UI never hangs on an
+# unreachable Ollama. Stream calls do their own (long) socket wait.
+_DEFAULT_TIMEOUT = httpx.Timeout(connect=2.0, read=5.0, write=5.0, pool=5.0)
+
+
+def _client(host: str) -> "ol.Client":
+    """Returns an ollama Client with a sensible default HTTP timeout."""
+    return ol.Client(host=host, timeout=_DEFAULT_TIMEOUT)
 
 
 def stream_chat(
     messages: list[dict], model: str, system_prompt: str, host: str, temperature: float
 ):
     """
-    Generator που yield-άρει tokens όπως έρχονται από το Ollama
-    (τα περισσότερα μοντέλα στέλνουν tokens ανά λέξη/υπολέξη).
+    Generator that yields tokens as they arrive from Ollama
+    (most models emit tokens at word / sub-word granularity).
     """
     full_messages = [{"role": "system", "content": system_prompt}] + messages
+    # Streaming chat: long-running, use ollama's default (no read timeout).
     client = ol.Client(host=host)
     for chunk in client.chat(
         model=model,
@@ -24,20 +35,22 @@ def stream_chat(
 
 
 def list_models(host: str) -> list[str]:
-    client = ol.Client(host=host)
     try:
+        client = _client(host)
         return [m["model"] for m in client.list()["models"]]
-    except Exception:
+    except Exception as e:
+        print(f"[ollama_client] list_models error: {e}", file=sys.stderr)
+        sys.stderr.flush()
         return []
 
 
 def get_capabilities(host: str, model: str) -> list[str]:
     """
     Returns model capabilities (e.g. ['completion', 'tools', 'vision']).
-    Empty list on error.
+    Empty list on error or unreachable host (with short timeout to keep UI snappy).
     """
     try:
-        client = ol.Client(host=host)
+        client = _client(host)
         info = client.show(model)
         caps = getattr(info, "capabilities", None)
         if caps is None and isinstance(info, dict):

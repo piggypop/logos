@@ -96,7 +96,7 @@ def detect_remember(text: str) -> str | None:
         m = pat.match(text.strip())
         if m:
             fact = m.group(1).strip()
-            # Strip leading particles like "ότι", "πως", "πάντα" iteratively
+            # Strip leading filler particles ("that", "ότι", "πως", "πάντα", ...) iteratively
             while True:
                 stripped = LEADING_PARTICLES.sub("", fact, count=1)
                 if stripped == fact:

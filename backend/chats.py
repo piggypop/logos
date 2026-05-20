@@ -1,4 +1,5 @@
 import json
+import re
 import shutil
 import uuid
 from datetime import datetime
@@ -6,6 +7,14 @@ from pathlib import Path
 
 CHATS_DIR = Path.home() / ".local" / "share" / "logos" / "chats"
 _LEGACY_DIR = Path.home() / ".local" / "share" / "chat_app" / "chats"
+
+# Accept UUID-ish ids: hex characters, dashes, length 1..80.
+# Anything else (path separators, dots, slashes, control chars) is rejected.
+_VALID_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,80}$")
+
+
+def is_valid_id(chat_id: str) -> bool:
+    return bool(chat_id) and bool(_VALID_ID_RE.fullmatch(chat_id))
 
 
 def _migrate_legacy():
@@ -60,6 +69,8 @@ def list_chats() -> list[dict]:
 
 
 def get(chat_id: str) -> dict | None:
+    if not is_valid_id(chat_id):
+        return None
     _ensure_dir()
     p = _path(chat_id)
     if not p.exists():
@@ -68,9 +79,11 @@ def get(chat_id: str) -> dict | None:
         return json.load(f)
 
 
-def save(chat_id: str | None, messages: list[dict], title: str | None = None) -> dict:
+def save(chat_id: str | None, messages: list[dict], title: str | None = None) -> dict | None:
     _ensure_dir()
     now = _now()
+    if chat_id and not is_valid_id(chat_id):
+        return None
     chat_id = chat_id or str(uuid.uuid4())
     p = _path(chat_id)
     if p.exists():
@@ -94,6 +107,8 @@ def save(chat_id: str | None, messages: list[dict], title: str | None = None) ->
 
 
 def rename(chat_id: str, title: str) -> dict | None:
+    if not is_valid_id(chat_id):
+        return None
     data = get(chat_id)
     if not data:
         return None
@@ -105,6 +120,8 @@ def rename(chat_id: str, title: str) -> dict | None:
 
 
 def delete(chat_id: str) -> bool:
+    if not is_valid_id(chat_id):
+        return False
     p = _path(chat_id)
     if p.exists():
         p.unlink()

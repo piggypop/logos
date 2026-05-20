@@ -1,9 +1,9 @@
 import json
 import os
-import socket
 import sys
 import threading
 import time
+import urllib.request
 
 BASE_DIR = sys._MEIPASS if getattr(sys, "frozen", False) else os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(BASE_DIR, "backend"))
@@ -76,14 +76,17 @@ class Api:
             return {"ok": False, "error": str(e)}
 
 
-def wait_for_port(host: str, port: int, timeout: float = 5.0) -> bool:
-    start = time.time()
-    while time.time() - start < timeout:
+def wait_for_http(host: str, port: int, timeout: float = 15.0) -> bool:
+    """Block until Flask actually serves HTTP 200 on /, not just accepts TCP."""
+    deadline = time.time() + timeout
+    url = f"http://{host}:{port}/"
+    while time.time() < deadline:
         try:
-            with socket.create_connection((host, port), timeout=0.2):
-                return True
-        except OSError:
-            time.sleep(0.05)
+            with urllib.request.urlopen(url, timeout=0.5) as r:
+                if r.status == 200:
+                    return True
+        except Exception:
+            time.sleep(0.1)
     return False
 
 
@@ -91,19 +94,49 @@ def run_flask(port: int):
     app.run(host="127.0.0.1", port=port, debug=False, threaded=True, use_reloader=False)
 
 
+SPLASH_HTML = """<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Logos</title>
+<style>
+  html,body{margin:0;height:100%;background:#0d0d0d;color:#666;
+    font-family:'JetBrains Mono','Fira Code',monospace;
+    display:flex;align-items:center;justify-content:center;
+    flex-direction:column;gap:14px;font-size:12px;letter-spacing:.08em}
+  .l{font-size:42px;color:#c8a96e;animation:pulse 1.4s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:.45}50%{opacity:1}}
+  .e{color:#e06c75;font-size:11px;max-width:80%;text-align:center;line-height:1.6}
+</style></head>
+<body>
+  <div class="l">Λ</div>
+  <div id="status">Starting Logos…</div>
+</body></html>"""
+
+
 def main():
     port = cfg.load().get("port", 17842)
     threading.Thread(target=run_flask, args=(port,), daemon=True).start()
-    wait_for_port("127.0.0.1", port)
-    webview.create_window(
+
+    window = webview.create_window(
         "Logos",
-        f"http://127.0.0.1:{port}/",
+        html=SPLASH_HTML,
         width=960,
         height=700,
         min_size=(600, 400),
+        maximized=True,
         js_api=Api(),
     )
-    webview.start()
+
+    def on_ready():
+        if wait_for_http("127.0.0.1", port):
+            window.load_url(f"http://127.0.0.1:{port}/")
+        else:
+            window.evaluate_js(
+                "document.getElementById('status').innerHTML = "
+                "'<div class=e>Backend failed to start within 15s.<br>"
+                "Run <code>/usr/bin/python3 /usr/share/logos/app.py</code> "
+                "from a terminal to see the error.</div>'"
+            )
+
+    webview.start(on_ready)
 
 
 if __name__ == "__main__":

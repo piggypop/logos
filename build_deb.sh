@@ -81,7 +81,7 @@ set -e
 if [ "$1" = "configure" ]; then
     /usr/bin/python3 -m pip install --break-system-packages --quiet --upgrade \
         flask flask-cors ollama httpx pywebview trafilatura youtube-transcript-api \
-        pypdf python-docx || {
+        ddgs pypdf python-docx websocket-client || {
         echo ""
         echo "WARNING: pip install failed. Logos may not start until you run:" >&2
         echo "  sudo pip3 install --break-system-packages -r /usr/share/logos/backend/requirements.txt" >&2

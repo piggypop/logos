@@ -308,6 +308,8 @@ footer {
   transition: all 0.15s;
 }
 #btn-attach:hover { color: var(--accent); border-color: var(--accent2); }
+#btn-image:hover { color: var(--accent); border-color: var(--accent2); }
+#btn-image:disabled { opacity: 0.4; cursor: not-allowed; }
 #btn-send {
   background: var(--accent);
   color: var(--bg);
@@ -318,6 +320,12 @@ footer {
 #btn-send:hover { background: var(--accent2); border-color: var(--accent2); }
 #btn-send:disabled { background: var(--border); border-color: var(--border); color: var(--muted); cursor: default; }
 #btn-search:hover { color: var(--accent); border-color: var(--accent2); }
+#btn-search.active {
+  background: rgba(200, 169, 110, 0.12);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+#btn-search.active:hover { background: rgba(200, 169, 110, 0.2); }
 
 /* ── Sources footer (under assistant message) ──────── */
 .msg-sources {
@@ -564,10 +572,57 @@ footer {
 #settings-panel {
   background: var(--bg2);
   border: 1px solid var(--border);
-  width: 480px;
-  max-height: 80vh;
+  width: 520px;
+  height: 70vh;
+  max-height: 720px;
   display: flex;
   flex-direction: column;
+}
+
+/* Tab bar */
+.settings-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg2);
+  flex-shrink: 0;
+}
+
+.settings-tab {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 10px 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-bottom: 2px solid transparent;
+  transition: color 0.1s, border-color 0.1s;
+}
+.settings-tab:hover { color: var(--text); }
+.settings-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* Tab panels — only the active one is displayed */
+.settings-tab-panel {
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+}
+.settings-tab-panel.active { display: flex; }
+
+/* Full-height widgets (system prompt textarea, memory list) */
+.settings-body textarea.full-height,
+.memory-list.full-height {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
 }
 
 .settings-header {
@@ -610,6 +665,97 @@ footer {
   gap: 8px;
 }
 
+.provider-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.muted-note {
+  font-size: 10px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+}
+
+.row-two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.row-two > div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Image modal */
+#image-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 110;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#image-panel {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  width: 560px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Assistant message images */
+.msg-image-wrap {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.msg-image {
+  max-width: 100%;
+  max-height: 600px;
+  border: 1px solid var(--border);
+  cursor: zoom-in;
+  display: block;
+}
+.msg-image-meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
+/* Fullscreen image viewer */
+#image-viewer {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.92);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: zoom-out;
+}
+#image-viewer img {
+  max-width: 95vw;
+  max-height: 95vh;
+}
+
+.notebook-warning {
+  background: rgba(224, 108, 117, 0.08);
+  border-left: 2px solid var(--error);
+  color: var(--error);
+  padding: 6px 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.settings-body input[type="password"],
 .settings-body input[type="text"],
 .settings-body input[type="number"],
 .settings-body select,

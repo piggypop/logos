@@ -5,13 +5,34 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Logos</title>
   <link rel="stylesheet" href="style.css">
-  <!-- marked.js για markdown rendering -->
+  <!-- marked.js for markdown rendering -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
-  <!-- highlight.js για code blocks -->
+  <!-- highlight.js for code blocks -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 </head>
 <body>
+  <!-- Image Generation Modal (ComfyUI) -->
+  <div id="image-overlay" class="hidden">
+    <div id="image-panel">
+      <div class="settings-header">
+        <span>Generate Image</span>
+        <button id="image-close">✕</button>
+      </div>
+      <div class="settings-body">
+        <label>Prompt</label>
+        <textarea id="img-prompt" rows="4" placeholder="describe what to generate..."></textarea>
+        <label>Negative prompt <span class="muted-note">(override; blank uses default)</span></label>
+        <textarea id="img-negative" rows="2"></textarea>
+        <div id="img-progress" class="muted-note"></div>
+      </div>
+      <div class="settings-footer">
+        <button id="img-generate">Generate</button>
+        <button id="img-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Settings Panel (hidden by default) -->
   <div id="settings-overlay" class="hidden">
     <div id="settings-panel">
@@ -19,43 +40,165 @@
         <span>Settings</span>
         <button id="settings-close">✕</button>
       </div>
+
+      <div class="settings-tabs">
+        <button class="settings-tab active" data-tab="model">Model</button>
+        <button class="settings-tab" data-tab="search">Search</button>
+        <button class="settings-tab" data-tab="prompt">System Prompt</button>
+        <button class="settings-tab" data-tab="notebook">Notebook</button>
+        <button class="settings-tab" data-tab="image">Image</button>
+        <button class="settings-tab" data-tab="memory">Memory</button>
+      </div>
+
       <div class="settings-body">
-        <label>Ollama Host</label>
-        <input type="text" id="s-ollama-host">
+        <!-- Model tab -->
+        <div class="settings-tab-panel active" data-panel="model">
+          <label>Ollama Host</label>
+          <input type="text" id="s-ollama-host">
 
-        <label>Model
-          <button id="s-refresh-models" class="inline-btn">↺</button>
-        </label>
-        <select id="s-model"></select>
+          <label>Model
+            <button id="s-refresh-models" class="inline-btn">↺</button>
+          </label>
+          <select id="s-model"></select>
 
-        <label>SearXNG URL</label>
-        <input type="text" id="s-searxng-url">
+          <label>Temperature</label>
+          <input type="range" id="s-temperature" min="0" max="2" step="0.1">
+          <span id="s-temperature-val">0.7</span>
 
-        <label>Search Results Count</label>
-        <input type="number" id="s-results-count" min="1" max="10">
+          <label>Your Location</label>
+          <input type="text" id="s-user-location" placeholder="e.g., Athens, Greece">
+        </div>
 
-        <label class="checkbox-label">
-          <input type="checkbox" id="s-auto-search"> Auto Search
-        </label>
+        <!-- Search tab -->
+        <div class="settings-tab-panel" data-panel="search">
+          <label>Search Provider</label>
+          <select id="s-search-provider">
+            <option value="ddg">DuckDuckGo (no setup)</option>
+            <option value="brave">Brave Search API</option>
+            <option value="searxng">SearXNG (self-hosted)</option>
+          </select>
 
-        <label>Your Location</label>
-        <input type="text" id="s-user-location" placeholder="e.g., Athens, Greece">
+          <div id="s-provider-brave" class="provider-field hidden">
+            <label>Brave API Key</label>
+            <input type="password" id="s-brave-api-key" placeholder="from api.search.brave.com">
+          </div>
 
-        <label>Temperature</label>
+          <div id="s-provider-searxng" class="provider-field hidden">
+            <label>SearXNG URL</label>
+            <input type="text" id="s-searxng-url" placeholder="http://localhost:8081">
+          </div>
 
-        <label>Temperature</label>
-        <input type="range" id="s-temperature" min="0" max="2" step="0.1">
-        <span id="s-temperature-val">0.7</span>
+          <label>Search Results Count</label>
+          <input type="number" id="s-results-count" min="1" max="20">
 
-        <label>System Prompt</label>
-        <textarea id="s-system-prompt" rows="4"></textarea>
+          <label class="checkbox-label">
+            <input type="checkbox" id="s-auto-search"> Auto Search
+          </label>
+        </div>
 
-        <div class="settings-section-divider"></div>
+        <!-- System Prompt tab (textarea takes full height) -->
+        <div class="settings-tab-panel" data-panel="prompt">
+          <label>System Prompt</label>
+          <textarea id="s-system-prompt" class="full-height"></textarea>
+        </div>
 
-        <label>Memory
-          <button id="s-memory-refresh" class="inline-btn" title="Refresh">↺</button>
-        </label>
-        <div id="s-memory-list" class="memory-list"></div>
+        <!-- Notebook tab -->
+        <div class="settings-tab-panel" data-panel="notebook">
+          <label>Open Notebook API URL</label>
+          <input type="text" id="s-notebook-url" placeholder="http://localhost:5055">
+
+          <label>Open Notebook UI URL <span class="muted-note">(for source links)</span></label>
+          <input type="text" id="s-notebook-ui-url" placeholder="http://localhost:8502">
+
+          <div style="display:flex; gap:8px; align-items:center;">
+            <button id="s-notebook-connect" class="inline-btn">Connect / Refresh</button>
+            <span id="s-notebook-status" class="muted-note">not connected</span>
+          </div>
+
+          <label>Active Notebook
+            <button id="s-notebook-refresh" class="inline-btn" title="Re-read sources from Open Notebook (clear cache)">↺</button>
+          </label>
+          <select id="s-notebook-active">
+            <option value="">— None (notebook integration off) —</option>
+          </select>
+          <div id="s-notebook-info" class="muted-note"></div>
+          <div id="s-notebook-warning" class="hidden notebook-warning"></div>
+        </div>
+
+        <!-- Image tab (ComfyUI) -->
+        <div class="settings-tab-panel" data-panel="image">
+          <label>ComfyUI URL</label>
+          <input type="text" id="s-comfyui-url" placeholder="http://localhost:8188">
+
+          <div style="display:flex; gap:8px; align-items:center;">
+            <button id="s-comfyui-connect" class="inline-btn">Connect / Refresh</button>
+            <span id="s-comfyui-status" class="muted-note">not connected</span>
+          </div>
+
+          <label>Workflow</label>
+          <select id="s-comfyui-workflow">
+            <option value="sdxl-default">Default txt2img (SDXL / SD 1.5 / SD 2)</option>
+            <option value="custom">Custom workflow (paste JSON)</option>
+          </select>
+
+          <div id="s-comfyui-custom-wrap" class="hidden">
+            <label>Custom workflow JSON
+              <span class="muted-note">(API format · use {{PROMPT}}, {{CHECKPOINT}}, {{SEED}}, {{STEPS}}, {{WIDTH}}, {{HEIGHT}}, {{SAMPLER}}, {{SCHEDULER}}, {{CFG}}, {{NEGATIVE}})</span>
+            </label>
+            <textarea id="s-comfyui-custom-workflow" rows="6" placeholder='{"3": {"inputs": {...}}, ...}'></textarea>
+          </div>
+
+          <label>Checkpoint</label>
+          <select id="s-comfyui-checkpoint"></select>
+
+          <div class="row-two">
+            <div>
+              <label>Sampler</label>
+              <select id="s-comfyui-sampler"></select>
+            </div>
+            <div>
+              <label>Scheduler</label>
+              <select id="s-comfyui-scheduler"></select>
+            </div>
+          </div>
+
+          <div class="row-two">
+            <div>
+              <label>Width</label>
+              <input type="number" id="s-comfyui-width" min="64" max="4096" step="64">
+            </div>
+            <div>
+              <label>Height</label>
+              <input type="number" id="s-comfyui-height" min="64" max="4096" step="64">
+            </div>
+          </div>
+
+          <div class="row-two">
+            <div>
+              <label>Steps</label>
+              <input type="number" id="s-comfyui-steps" min="1" max="200">
+            </div>
+            <div>
+              <label>CFG</label>
+              <input type="number" id="s-comfyui-cfg" min="0" max="30" step="0.5">
+            </div>
+          </div>
+
+          <label>Negative prompt</label>
+          <textarea id="s-comfyui-negative" rows="2"></textarea>
+
+          <label class="checkbox-label">
+            <input type="checkbox" id="s-comfyui-commentary"> LLM commentary after generation
+          </label>
+        </div>
+
+        <!-- Memory tab -->
+        <div class="settings-tab-panel" data-panel="memory">
+          <label>Memory
+            <button id="s-memory-refresh" class="inline-btn" title="Refresh">↺</button>
+          </label>
+          <div id="s-memory-list" class="memory-list full-height"></div>
+        </div>
       </div>
       <div class="settings-footer">
         <button id="settings-save">Save</button>
@@ -105,6 +248,7 @@
         ></textarea>
         <div id="input-buttons">
           <button id="btn-attach" title="Attach file">📎</button>
+          <button id="btn-image" title="Generate image (ComfyUI)">🎨</button>
           <button id="btn-search" title="Force web search">🔍</button>
           <button id="btn-send">Send</button>
         </div>

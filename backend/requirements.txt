@@ -5,5 +5,7 @@ httpx
 pywebview
 trafilatura
 youtube-transcript-api
+ddgs
 pypdf
 python-docx
+websocket-client

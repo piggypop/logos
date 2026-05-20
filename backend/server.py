@@ -5,15 +5,19 @@ import threading
 from datetime import datetime
 
 import chats as chats_store
+import comfyui_client
 import config as cfg
 import file_extractor
+import image_storage
+import image_workflows
 import memory as mem
 import ollama_client
-import searxng_client
+import open_notebook_client
+import search_providers
 import tool_router
 import url_fetcher
 import version as version_mod
-from flask import Flask, Response, jsonify, request, send_from_directory, stream_with_context
+from flask import Flask, Response, jsonify, request, send_file, send_from_directory, stream_with_context
 from flask_cors import CORS
 
 
@@ -116,8 +120,8 @@ def do_search():
     data = request.json
     query = data.get("query", "")
     c = cfg.load()
-    results = searxng_client.search(query, c["searxng_url"], c["searxng_results_count"])
-    return jsonify({"results": results})
+    results = search_providers.search(query, c)
+    return jsonify({"results": results, "provider": c.get("search_provider", "ddg")})
 
 
 # ── Chats (archive) ──────────────────────────────────────
@@ -138,10 +142,14 @@ def get_chat_endpoint(chat_id):
 
 @app.put("/api/chats/<chat_id>")
 def upsert_chat_endpoint(chat_id):
+    if not chats_store.is_valid_id(chat_id):
+        return jsonify({"error": "invalid chat id"}), 400
     body = request.json or {}
     messages = body.get("messages", [])
     title = body.get("title")
     data = chats_store.save(chat_id, messages, title)
+    if data is None:
+        return jsonify({"error": "save failed"}), 400
     return jsonify(data)
 
 
@@ -161,7 +169,207 @@ def rename_chat_endpoint(chat_id):
 def delete_chat_endpoint(chat_id):
     if not chats_store.delete(chat_id):
         return jsonify({"error": "not found"}), 404
+    # Best-effort cleanup of any generated images attached to this chat
+    try:
+        image_storage.delete_for_chat(chat_id)
+    except Exception as e:
+        print(f"[server] image cleanup error: {e}", file=sys.stderr)
+        sys.stderr.flush()
     return jsonify({"ok": True})
+
+
+# ── Open Notebook ────────────────────────────────────────
+
+
+@app.get("/api/notebooks")
+def list_notebooks_endpoint():
+    c = cfg.load()
+    url = c.get("open_notebook_url") or ""
+    ok = open_notebook_client.ping(url)
+    if not ok:
+        return jsonify({"ok": False, "error": "Open Notebook unreachable", "notebooks": []})
+    notebooks = open_notebook_client.list_notebooks(url)
+    return jsonify({"ok": True, "notebooks": notebooks})
+
+
+@app.get("/api/notebooks/<path:notebook_id>/preview")
+def notebook_preview_endpoint(notebook_id):
+    """Fetch notebook content (cached) and return size info — used by UI to
+    show 'X sources, ~Y tokens' next to the dropdown."""
+    c = cfg.load()
+    nb = open_notebook_client.get_notebook_with_content(
+        c.get("open_notebook_url") or "", notebook_id
+    )
+    if not nb:
+        return jsonify({"ok": False, "error": "could not load notebook"}), 404
+    return jsonify(
+        {
+            "ok": True,
+            "id": nb["id"],
+            "name": nb["name"],
+            "source_count": len(nb.get("sources", [])),
+            "total_chars": nb.get("total_chars", 0),
+            "total_tokens_est": nb.get("total_tokens_est", 0),
+        }
+    )
+
+
+@app.post("/api/notebooks/refresh")
+def notebook_refresh_endpoint():
+    """Invalidate the in-memory notebook cache so the next preview / chat call
+    re-fetches sources from Open Notebook. Use after editing the notebook in
+    Open Notebook's UI."""
+    open_notebook_client.invalidate_cache()
+    return jsonify({"ok": True})
+
+
+# ── ComfyUI (image generation) ───────────────────────────
+
+
+@app.get("/api/comfyui/status")
+def comfyui_status():
+    c = cfg.load()
+    url = c.get("comfyui_url") or ""
+    # ?refresh=1 forces a fresh /object_info fetch (bypassing the 30s cache)
+    if request.args.get("refresh") == "1":
+        comfyui_client.invalidate_object_info_cache(url)
+    ok = comfyui_client.ping(url)
+    if not ok:
+        return jsonify({"ok": False, "error": "ComfyUI unreachable"})
+    d = comfyui_client.discover(url)
+    if not d.get("ok"):
+        return jsonify({"ok": True, "discovered": False, "error": d.get("error", "")})
+    return jsonify(
+        {
+            "ok": True,
+            "discovered": True,
+            "checkpoints": d["checkpoints"],
+            "samplers": d["samplers"],
+            "schedulers": d["schedulers"],
+        }
+    )
+
+
+@app.post("/api/comfyui/generate")
+def comfyui_generate():
+    """SSE stream:
+        {type: 'queued', prompt_id}
+        {type: 'progress', value, max, node}
+        {type: 'image', path, prompt, params}
+        {type: 'error', message}
+    Body: {prompt, chat_id?, overrides?: {checkpoint, steps, width, height, ...}}
+    """
+    body = request.json or {}
+    user_prompt = (body.get("prompt") or "").strip()
+    chat_id = body.get("chat_id") or None
+    overrides = body.get("overrides") or {}
+
+    if not user_prompt:
+        return jsonify({"error": "prompt required"}), 400
+
+    c = cfg.load()
+    url = c.get("comfyui_url") or ""
+    wf_name = c.get("comfyui_workflow") or "sdxl-default"
+    template = image_workflows.get_template(
+        wf_name, c.get("comfyui_custom_workflow") or ""
+    )
+    if template is None:
+        return jsonify({"error": f"workflow '{wf_name}' invalid"}), 400
+
+    seed = overrides.get("seed") or comfyui_client.new_seed()
+    params = {
+        "prompt": user_prompt,
+        "negative": overrides.get("negative", c.get("comfyui_negative_prompt", "")),
+        "checkpoint": overrides.get("checkpoint", c.get("comfyui_checkpoint", "")),
+        "seed": int(seed),
+        "steps": int(overrides.get("steps", c.get("comfyui_steps", 30))),
+        "cfg": float(overrides.get("cfg", c.get("comfyui_cfg", 7.5))),
+        "sampler": overrides.get("sampler", c.get("comfyui_sampler", "euler")),
+        "scheduler": overrides.get("scheduler", c.get("comfyui_scheduler", "normal")),
+        "width": int(overrides.get("width", c.get("comfyui_width", 1024))),
+        "height": int(overrides.get("height", c.get("comfyui_height", 1024))),
+    }
+    workflow = image_workflows.render(template, params)
+    client_id = comfyui_client.new_client_id()
+
+    def generate():
+        try:
+            prompt_id = comfyui_client.submit_prompt(url, workflow, client_id)
+            if not prompt_id:
+                yield f"data: {json.dumps({'type': 'error', 'message': 'ComfyUI rejected the workflow (check checkpoint name and that all required custom nodes are installed)'})}\n\n"
+                sys.stdout.flush()
+                return
+            yield f"data: {json.dumps({'type': 'queued', 'prompt_id': prompt_id})}\n\n"
+            sys.stdout.flush()
+
+            image_outputs = []
+            for ev in comfyui_client.stream_progress(url, client_id, prompt_id):
+                if ev["type"] == "progress":
+                    yield f"data: {json.dumps(ev)}\n\n"
+                    sys.stdout.flush()
+                elif ev["type"] == "executed":
+                    out = ev.get("output", {}) or {}
+                    for img in out.get("images", []) or []:
+                        image_outputs.append(img)
+                elif ev["type"] == "error":
+                    yield f"data: {json.dumps(ev)}\n\n"
+                    sys.stdout.flush()
+                    return
+                elif ev["type"] == "done":
+                    break
+
+            if not image_outputs:
+                yield f"data: {json.dumps({'type': 'error', 'message': 'workflow completed but no images returned'})}\n\n"
+                sys.stdout.flush()
+                return
+
+            for img in image_outputs:
+                data = comfyui_client.fetch_image(
+                    url,
+                    filename=img.get("filename", ""),
+                    subfolder=img.get("subfolder", ""),
+                    folder_type=img.get("type", "output"),
+                )
+                if not data:
+                    continue
+                ext = (img.get("filename", "").rsplit(".", 1) + ["png"])[-1].lower()
+                saved = image_storage.save(data, chat_id, seed, ext=ext)
+                payload = {
+                    "type": "image",
+                    "path": str(saved),
+                    "filename": saved.name,
+                    "prompt": user_prompt,
+                    "params": {
+                        "seed": params["seed"],
+                        "steps": params["steps"],
+                        "width": params["width"],
+                        "height": params["height"],
+                        "checkpoint": params["checkpoint"],
+                        "sampler": params["sampler"],
+                        "cfg": params["cfg"],
+                        "workflow": wf_name,
+                    },
+                }
+                yield f"data: {json.dumps(payload)}\n\n"
+                sys.stdout.flush()
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+            sys.stdout.flush()
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
+    )
+
+
+@app.get("/api/images/<path:rel_path>")
+def serve_image(rel_path):
+    """Serve a generated image from IMAGES_ROOT. Path traversal-protected."""
+    full = image_storage.IMAGES_ROOT / rel_path
+    if not image_storage.is_safe_path(full) or not full.exists():
+        return jsonify({"error": "not found"}), 404
+    return send_file(str(full))
 
 
 # ── Memory ───────────────────────────────────────────────
@@ -223,7 +431,7 @@ def chat():
         c = cfg.load()
 
         try:
-            # ── Manual memory trigger ("να θυμάσαι ...") ──
+            # ── Manual memory trigger ("remember ..." / "να θυμάσαι ...") ──
             remember_text = mem.detect_remember(last_user_message)
             if remember_text:
                 if mem.add(remember_text, source="manual"):
@@ -232,6 +440,20 @@ def chat():
 
             # Build context AFTER any manual memory add (so it's included)
             sys_ctx = _system_context(c)
+
+            # ── Active notebook (Open Notebook) ──────────
+            notebook_sources: list[dict] = []
+            active_nb_id = c.get("active_notebook_id") or ""
+            if active_nb_id:
+                yield f"data: {json.dumps({'type': 'loading_notebook', 'notebook_id': active_nb_id})}\n\n"
+                sys.stdout.flush()
+                nb = open_notebook_client.get_notebook_with_content(
+                    c.get("open_notebook_url") or "", active_nb_id
+                )
+                if nb:
+                    notebook_sources = open_notebook_client.as_chat_sources(
+                        nb, c.get("open_notebook_ui_url") or ""
+                    )
 
             # ── URL fetching ─────────────────────────────
             url_contents: list[dict] = []
@@ -250,7 +472,7 @@ def chat():
 
             if force_search:
                 do_web_search = True
-            elif c["auto_search_enabled"] and not url_contents:
+            elif c["auto_search_enabled"] and not url_contents and not notebook_sources:
                 do_web_search = tool_router.needs_search(
                     last_user_message, c["ollama_host"], c["ollama_model"]
                 )
@@ -261,19 +483,17 @@ def chat():
                 query = tool_router.reformulate_query(
                     messages, c["ollama_host"], c["ollama_model"]
                 )
-                search_results = searxng_client.search(
-                    query, c["searxng_url"], c["searxng_results_count"]
-                )
+                search_results = search_providers.search(query, c)
 
-            # ── Combine sources (URLs first, then search) ─
-            all_sources = url_contents + search_results
+            # ── Combine sources (notebook first, then URLs, then search) ─
+            all_sources = notebook_sources + url_contents + search_results
             if all_sources:
                 yield f"data: {json.dumps({'type': 'sources', 'query': query, 'sources': all_sources})}\n\n"
                 sys.stdout.flush()
 
             # ── System prompt ────────────────────────────
             if all_sources:
-                context_str = searxng_client.format_as_context(all_sources)
+                context_str = search_providers.format_as_context(all_sources)
                 base = c["search_system_prompt"] + "\n\n" + context_str
             else:
                 base = c["system_prompt"]

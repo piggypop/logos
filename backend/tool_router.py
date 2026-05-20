@@ -9,15 +9,15 @@ def _last_user_message(messages: list[dict]) -> str:
 
 def reformulate_query(messages: list[dict], host: str, model: str) -> str:
     """
-    Παίρνει το conversation context και επιστρέφει ένα self-contained search
-    query. Fail-safe: επιστρέφει το τελευταίο user message σε error.
+    Takes the conversation context and returns a self-contained search query.
+    Fail-safe: returns the last user message verbatim on error.
     """
     if not messages:
         return ""
     fallback = _last_user_message(messages)
     try:
         recent = messages[-6:]
-        client = ol.Client(host=host)
+        client = ol.Client(host=host, timeout=30.0)
         response = client.chat(
             model=model,
             messages=[
@@ -66,8 +66,8 @@ def extract_facts(
     existing_facts: list[str],
 ) -> list[str]:
     """
-    Διαβάζει την τελευταία ανταλλαγή και επιστρέφει νέα persistent facts για
-    τον χρήστη. Επιστρέφει [] σε error ή αν δεν υπάρχει κάτι νέο.
+    Reads the latest exchange and returns NEW persistent facts about the user.
+    Returns [] on error or if nothing genuinely new was revealed.
     """
     if not messages:
         return []
@@ -75,7 +75,7 @@ def extract_facts(
         existing_block = (
             "\n".join(f"- {f}" for f in existing_facts) if existing_facts else "(none yet)"
         )
-        client = ol.Client(host=host)
+        client = ol.Client(host=host, timeout=30.0)
         response = client.chat(
             model=model,
             messages=[
@@ -119,10 +119,10 @@ def extract_facts(
 
 def needs_search(user_message: str, host: str, model: str) -> bool:
     """
-    Ρωτά το LLM αν χρειάζεται web search. Fail-safe: επιστρέφει False σε error.
+    Asks the LLM whether web search is needed. Fail-safe: returns False on error.
     """
     try:
-        client = ol.Client(host=host)
+        client = ol.Client(host=host, timeout=30.0)
         response = client.chat(
             model=model,
             messages=[
