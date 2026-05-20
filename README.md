@@ -1,6 +1,17 @@
 # Λ Logos
 
-> Minimal desktop chat app for local LLMs via Ollama — with multi-provider web search, URL & YouTube reading, file attachments, persistent memory, Open Notebook integration, and ComfyUI image generation.
+> **λόγος** (*lógos*) · n., Ancient Greek
+> 1. that which is said: word, sentence, speech, story, debate, utterance, argument
+> 2. that which is thought: idea, conception, consideration, reason, reckoning, computation
+> 3. an account, explanation, or narrative
+> 4. subject matter
+> 5. *(theology)* the Word or Wisdom of God
+>
+> — [Wiktionary, *λόγος*](https://en.wiktionary.org/wiki/%CE%BB%CF%8C%CE%B3%CE%BF%CF%82)
+
+---
+
+Minimal desktop chat app for local LLMs via Ollama — with multi-provider web search, URL & YouTube reading, file attachments, persistent memory, Open Notebook integration, and ComfyUI image generation.
 
 **Click an icon, get a chat window.** No accounts, no cloud, no telemetry. Your config, chats, memory, and generated images live on your machine.
 
