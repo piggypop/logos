@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Logos</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- marked.js για markdown rendering -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+  <!-- highlight.js για code blocks -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+</head>
+<body>
+  <!-- Settings Panel (hidden by default) -->
+  <div id="settings-overlay" class="hidden">
+    <div id="settings-panel">
+      <div class="settings-header">
+        <span>Settings</span>
+        <button id="settings-close">✕</button>
+      </div>
+      <div class="settings-body">
+        <label>Ollama Host</label>
+        <input type="text" id="s-ollama-host">
+
+        <label>Model
+          <button id="s-refresh-models" class="inline-btn">↺</button>
+        </label>
+        <select id="s-model"></select>
+
+        <label>SearXNG URL</label>
+        <input type="text" id="s-searxng-url">
+
+        <label>Search Results Count</label>
+        <input type="number" id="s-results-count" min="1" max="10">
+
+        <label class="checkbox-label">
+          <input type="checkbox" id="s-auto-search"> Auto Search
+        </label>
+
+        <label>Your Location</label>
+        <input type="text" id="s-user-location" placeholder="e.g., Athens, Greece">
+
+        <label>Temperature</label>
+
+        <label>Temperature</label>
+        <input type="range" id="s-temperature" min="0" max="2" step="0.1">
+        <span id="s-temperature-val">0.7</span>
+
+        <label>System Prompt</label>
+        <textarea id="s-system-prompt" rows="4"></textarea>
+
+        <div class="settings-section-divider"></div>
+
+        <label>Memory
+          <button id="s-memory-refresh" class="inline-btn" title="Refresh">↺</button>
+        </label>
+        <div id="s-memory-list" class="memory-list"></div>
+      </div>
+      <div class="settings-footer">
+        <button id="settings-save">Save</button>
+        <button id="settings-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Layout -->
+  <div id="app">
+    <header>
+      <div id="header-left">
+        <span id="app-title">Λ logos</span>
+        <span id="model-badge">—</span>
+      </div>
+      <div id="header-right">
+        <button id="btn-new-chat" title="New Chat">⊕</button>
+        <button id="btn-settings" title="Settings">⚙</button>
+        <button id="btn-sidebar-toggle" title="Chat history">☰</button>
+      </div>
+    </header>
+
+    <!-- Sidebar (chat archive) -->
+    <aside id="sidebar" class="closed">
+      <div id="sidebar-header">
+        <span>History</span>
+        <button id="btn-sidebar-close" title="Close">✕</button>
+      </div>
+      <div id="chat-list"></div>
+    </aside>
+
+    <main id="chat-area">
+      <div id="messages"></div>
+      <div id="search-indicator" class="hidden">
+        <span class="search-spinner">⟳</span>
+        <span id="search-label">Searching…</span>
+      </div>
+    </main>
+
+    <footer>
+      <div id="attachments-bar" class="hidden"></div>
+      <div id="input-row">
+        <textarea
+          id="user-input"
+          placeholder="Message… (Enter to send, Shift+Enter for newline)"
+          rows="1"
+        ></textarea>
+        <div id="input-buttons">
+          <button id="btn-attach" title="Attach file">📎</button>
+          <button id="btn-search" title="Force web search">🔍</button>
+          <button id="btn-send">Send</button>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

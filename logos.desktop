@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Logos
+GenericName=Local LLM Chat
+Comment=Chat with local LLMs, web search, URL/YouTube reading, file attachments
+Exec=/usr/bin/logos
+Icon=logos
+Terminal=false
+Categories=Network;Chat;
+StartupWMClass=Logos
+Keywords=chat;llm;ai;ollama;

@@ -1,0 +1,9 @@
+flask
+flask-cors
+ollama
+httpx
+pywebview
+trafilatura
+youtube-transcript-api
+pypdf
+python-docx

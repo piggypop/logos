@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Logos app icon: gold Λ (lambda) on dark rounded square -->
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1a1a1a"/>
+      <stop offset="1" stop-color="#0a0a0a"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="1024" height="1024" rx="180" ry="180" fill="url(#bgGrad)"/>
+  <rect x="6" y="6" width="1012" height="1012" rx="176" ry="176"
+        fill="none" stroke="#2a2a2a" stroke-width="2"/>
+  <!-- Λ glyph as stroked polyline -->
+  <path d="M 302 820 L 512 220 L 722 820"
+        fill="none"
+        stroke="#c8a96e"
+        stroke-width="80"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
+</svg>
