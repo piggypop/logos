@@ -1,8 +1,10 @@
+import hashlib
 import json
 import os
 import sys
 import threading
 from datetime import datetime
+from pathlib import Path
 
 import chats as chats_store
 import comfyui_client
@@ -18,7 +20,15 @@ import search_providers
 import tool_router
 import url_fetcher
 import version as version_mod
-from flask import Flask, Response, jsonify, request, send_file, send_from_directory, stream_with_context
+from flask import (
+    Flask,
+    Response,
+    jsonify,
+    request,
+    send_file,
+    send_from_directory,
+    stream_with_context,
+)
 from flask_cors import CORS
 
 
@@ -54,6 +64,7 @@ def _build_system_prompt(
         sources_block=sources_block,
     )
 
+
 if getattr(sys, "frozen", False):
     FRONTEND_DIR = os.path.join(sys._MEIPASS, "frontend")
 else:
@@ -74,6 +85,7 @@ def index():
 @app.get("/api/version")
 def get_version():
     return jsonify({"app": version_mod.APP_NAME, "version": version_mod.VERSION})
+
 
 # ── Config ──────────────────────────────────────────────
 
@@ -195,7 +207,9 @@ def list_notebooks_endpoint():
     url = c.get("open_notebook_url") or ""
     ok = open_notebook_client.ping(url)
     if not ok:
-        return jsonify({"ok": False, "error": "Open Notebook unreachable", "notebooks": []})
+        return jsonify(
+            {"ok": False, "error": "Open Notebook unreachable", "notebooks": []}
+        )
     notebooks = open_notebook_client.list_notebooks(url)
     return jsonify({"ok": True, "notebooks": notebooks})
 
@@ -505,6 +519,32 @@ def chat():
                 sources_block=sources_block,
                 has_notebook=bool(notebook_sources),
             )
+
+            # ── Debug: log assembled system prompt (Phase A1) ──
+            if c.get("debug_log_prompts"):
+                try:
+                    debug_dir = Path.home() / ".local" / "share" / "logos" / "debug"
+                    debug_dir.mkdir(parents=True, exist_ok=True)
+                    log_path = debug_dir / "prompts.log"
+                    # Rotate at ~5 MB: keep only the last ~1 MB
+                    if log_path.exists() and log_path.stat().st_size > 5 * 1024 * 1024:
+                        raw = log_path.read_bytes()
+                        keep = raw[-1024 * 1024 :]  # last 1 MB
+                        # Start at the next newline so we don't split a JSON line
+                        nl = keep.find(b"\n")
+                        log_path.write_bytes(keep[nl + 1 :] if nl != -1 else keep)
+                    entry = {
+                        "timestamp": datetime.now().astimezone().isoformat(),
+                        "model": c["ollama_model"],
+                        "last_user_hash": hashlib.sha256(
+                            last_user_message.encode("utf-8", errors="replace")
+                        ).hexdigest()[:12],
+                        "system_prompt": system_prompt,
+                    }
+                    with open(log_path, "a", encoding="utf-8") as lf:
+                        lf.write(json.dumps(entry, ensure_ascii=False) + "\n")
+                except Exception:
+                    pass  # debug logging must never break the chat stream
 
             # ── Inject attachments (text inline, images via Ollama images field)
             ollama_messages = file_extractor.build_ollama_messages(messages)

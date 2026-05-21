@@ -40,6 +40,10 @@ DEFAULTS = {
     "comfyui_height": 1024,
     "comfyui_negative_prompt": "blurry, low quality, watermark, text, signature",
     "comfyui_post_commentary": True,
+    # Debug: when true, the full assembled system prompt is appended to
+    # ~/.local/share/logos/debug/prompts.log on every chat turn (JSONL, rotated at ~5 MB).
+    # Off by default — the log contains conversation history and memory facts.
+    "debug_log_prompts": False,
 }
 
 
