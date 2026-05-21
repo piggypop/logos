@@ -2,6 +2,8 @@ import json
 import shutil
 from pathlib import Path
 
+import prompts as _prompts
+
 CONFIG_DIR = Path.home() / ".config" / "logos"
 CONFIG_PATH = CONFIG_DIR / "config.json"
 _LEGACY_PATH = Path.home() / ".config" / "chat_app" / "config.json"
@@ -16,15 +18,9 @@ DEFAULTS = {
     "ddg_safesearch": "moderate",
     "ddg_region": "wt-wt",
     "auto_search_enabled": True,
-    "system_prompt": "You are a helpful assistant. Answer in the same language the user writes in.",
-    "search_system_prompt": (
-        "You have REAL-TIME web search results below. "
-        "You MUST use them to answer the user's question. "
-        "NEVER say you cannot access the internet or don't have real-time data — you DO have fresh search results right now. "
-        "Base your answer primarily on the search results, not on your training data. "
-        "Cite sources with [1], [2] etc. for each piece of information you use. "
-        "Answer in the same language the user writes in."
-    ),
+    # The user-editable main system prompt. Defaults to the carefully tuned
+    # behavior rules in prompts.py — see that module before changing.
+    "system_prompt": _prompts.MAIN_SYSTEM_PROMPT,
     "temperature": 0.7,
     "port": 17842,
     "user_location": "",
@@ -55,6 +51,11 @@ def _migrate_legacy():
     shutil.copy2(_LEGACY_PATH, CONFIG_PATH)
 
 
+_OLD_DEFAULT_SYSTEM_PROMPT = (
+    "You are a helpful assistant. Answer in the same language the user writes in."
+)
+
+
 def load() -> dict:
     _migrate_legacy()
     if CONFIG_PATH.exists():
@@ -63,6 +64,10 @@ def load() -> dict:
         # one-time field rename
         if "searxng_results_count" in data and "search_results_count" not in data:
             data["search_results_count"] = data.pop("searxng_results_count")
+        # Upgrade users on the well-known old default to the new hardened prompt.
+        # Custom prompts are preserved untouched.
+        if (data.get("system_prompt") or "").strip() == _OLD_DEFAULT_SYSTEM_PROMPT:
+            data["system_prompt"] = _prompts.MAIN_SYSTEM_PROMPT
         return {**DEFAULTS, **data}
     return DEFAULTS.copy()
 

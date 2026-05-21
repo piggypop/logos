@@ -37,6 +37,35 @@ def _now() -> str:
     return datetime.now().isoformat(timespec="seconds")
 
 
+# Keys preserved on saved sources. The heavy `content` field is intentionally
+# stripped — it's re-fetched live from the relevant backend (notebook, URL,
+# search provider) on demand. Saved sources are for display attribution only.
+_SOURCE_KEEP_KEYS = ("title", "url", "category", "notebook_id", "source_id")
+
+
+def _slim_sources(sources: list[dict] | None) -> list[dict]:
+    if not sources:
+        return []
+    out = []
+    for s in sources:
+        if not isinstance(s, dict):
+            continue
+        out.append({k: s[k] for k in _SOURCE_KEEP_KEYS if k in s and s[k] is not None})
+    return out
+
+
+def _slim_messages(messages: list[dict]) -> list[dict]:
+    """Return messages with assistant `sources[*].content` removed, leaving
+    only display metadata. Avoids multi-MB chat files when notebooks are
+    active. User attachments and assistant `image` blocks are kept intact."""
+    out = []
+    for m in messages or []:
+        if m.get("role") == "assistant" and m.get("sources"):
+            m = {**m, "sources": _slim_sources(m["sources"])}
+        out.append(m)
+    return out
+
+
 def _auto_title(messages: list[dict], max_len: int = 50) -> str:
     for m in messages:
         if m.get("role") == "user":
@@ -86,20 +115,21 @@ def save(chat_id: str | None, messages: list[dict], title: str | None = None) ->
         return None
     chat_id = chat_id or str(uuid.uuid4())
     p = _path(chat_id)
+    slim = _slim_messages(messages)
     if p.exists():
         with open(p) as f:
             data = json.load(f)
-        data["messages"] = messages
+        data["messages"] = slim
         data["updated_at"] = now
         if title is not None:
             data["title"] = title
     else:
         data = {
             "id": chat_id,
-            "title": title or _auto_title(messages),
+            "title": title or _auto_title(slim),
             "created_at": now,
             "updated_at": now,
-            "messages": messages,
+            "messages": slim,
         }
     with open(p, "w") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)

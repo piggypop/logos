@@ -1,6 +1,6 @@
 # Logos — Developer & LLM Reference
 
-> Complete architecture and API reference for anyone (human or LLM) modifying, fixing, or extending Logos. Version 1.1.
+> Complete architecture and API reference for anyone (human or LLM) modifying, fixing, or extending Logos. Version 1.2.
 
 This document is the **single source of truth**. If you change something material, update this file in the same commit.
 
@@ -63,6 +63,7 @@ logos/
 │   ├── chats.py            # chat archive (one JSON per chat) + id validation
 │   ├── memory.py           # persistent user facts + manual-trigger detection
 │   ├── ollama_client.py    # ollama wrapper: stream_chat, list_models, get_capabilities
+│   ├── prompts.py          # SINGLE source for every string sent to an LLM
 │   ├── tool_router.py      # LLM-driven: needs_search, reformulate_query, extract_facts
 │   ├── search_providers.py # unified dispatch: DDG, Brave, SearXNG
 │   ├── url_fetcher.py      # extract URLs, generic webpage fetch, YouTube transcript
@@ -117,9 +118,10 @@ All four modules implement **one-time auto-migration** from the legacy `chat_app
     }
   ],
 
-  // assistant only, optional
+  // assistant only, optional — content is intentionally stripped before save
+  // (re-fetched live on demand); only display metadata is persisted
   "sources": [
-    {"title": "...", "url": "...", "content": "...", "category": "notebook"?}
+    {"title": "...", "url": "...", "category": "notebook"?, "notebook_id"?: "...", "source_id"?: "..."}
   ],
   "image": {                            // assistant only, when produced by ComfyUI
     "path": "/abs/path/.png",
@@ -152,7 +154,7 @@ All endpoints JSON in / JSON out unless noted. Base: `http://127.0.0.1:<port>`.
 | POST | `/api/config` | partial dict | `{ok: true}` (merged + saved) |
 | GET | `/api/models` | — | `{models: [string]}` (from Ollama) |
 | GET | `/api/capabilities` | — | `{model, capabilities: [string], supports_images, supports_audio, accept: [string]}` |
-| GET | `/api/version` | — | `{app: "Logos", version: "1.1.0"}` |
+| GET | `/api/version` | — | `{app: "Logos", version: "1.2.0"}` |
 
 ### Search (direct invocation; bypasses LLM routing)
 
@@ -305,8 +307,21 @@ Flat dict, JSON on disk. `load()` merges saved data over `DEFAULTS`, runs `_migr
 ### `chats.py`
 One JSON per chat. UUID-keyed. `is_valid_id()` gates every file op. `list_chats()` returns metadata only (no messages), sorted by `updated_at` desc. `save()` is upsert — keeps `created_at` if file exists, always updates `updated_at`. Returns `None` on invalid id.
 
+**Source slimming on save**: `_slim_messages()` strips `sources[*].content` before persisting. Saved sources keep only `title, url, category, notebook_id, source_id` for display attribution. This keeps chat files small (a 10-source notebook turn drops from ~500 KB to ~2 KB). Content is re-fetched live from the relevant backend (notebook / URL / search) on the next turn.
+
 ### `memory.py`
-Single JSON. `detect_remember(text)` matches English (`/remember`, `remember:`) and Greek (`να θυμάσαι`, `θυμήσου`, `να θυμάμαι`) triggers, then strips leading filler particles (`that`, `ότι`, `πως`, `πάντα`). `add()` does case-insensitive dedupe. `format_for_prompt(facts)` produces the bullet block that's appended to system context.
+Single JSON. `detect_remember(text)` matches English (`/remember`, `remember:`) and Greek (`να θυμάσαι`, `θυμήσου`, `να θυμάμαι`) triggers, then strips leading filler particles (`that`, `ότι`, `πως`, `πάντα`). `add()` does case-insensitive dedupe. Storage only — prompt formatting lives in `prompts.memory_block()`.
+
+### `prompts.py`
+**Single source of truth for every string sent to an LLM**. Defines:
+- `MAIN_SYSTEM_PROMPT` — the hardened default for `config.system_prompt` (anti-sycophancy, ask-before-assume, proportional length, honest uncertainty).
+- `SEARCH_MODE_PROMPT` — addendum injected when sources are present.
+- `NOTEBOOK_PROMPT` — addendum when an active notebook is loaded; instructs the model to say so explicitly if the question is off-topic.
+- `MEMORY_HEADER` + `memory_block()` — wraps user facts with "use ONLY if directly relevant; do not volunteer unprompted".
+- `ROUTER_NEEDS_SEARCH`, `QUERY_REFORMULATOR`, `fact_extractor_system()` — system prompts for the three internal LLM helpers in `tool_router.py`.
+- `compose_system_prompt(...)` — the single function that assembles the final system message from all the above plus runtime context.
+
+If you change ANY string a model sees, do it here. Avoid inlining prompts in other modules.
 
 ### `ollama_client.py`
 Thin wrapper. `stream_chat()` is a generator yielding token strings (no read timeout — streams can run minutes). `list_models()` and `get_capabilities()` use a **short HTTP timeout** (connect 2s, read 5s) so the Settings UI never hangs on an unreachable Ollama.

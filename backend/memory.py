@@ -106,10 +106,5 @@ def detect_remember(text: str) -> str | None:
     return None
 
 
-def format_for_prompt(facts: list[dict]) -> str:
-    if not facts:
-        return ""
-    lines = ["What you remember about the user (from past conversations):"]
-    for f in facts:
-        lines.append(f"- {f['text']}")
-    return "\n".join(lines)
+# Prompt formatting lives in prompts.py (memory_block). This module now only
+# handles storage and detection.

@@ -1,6 +1,14 @@
+"""LLM-driven routing and extraction helpers.
+
+All prompt strings live in `prompts.py`. This module only orchestrates the
+LLM calls and parses their output. Every function is fail-safe and never
+raises into the chat endpoint.
+"""
 import sys
 
 import ollama as ol
+
+import prompts
 
 
 def _last_user_message(messages: list[dict]) -> str:
@@ -8,44 +16,19 @@ def _last_user_message(messages: list[dict]) -> str:
 
 
 def reformulate_query(messages: list[dict], host: str, model: str) -> str:
-    """
-    Takes the conversation context and returns a self-contained search query.
-    Fail-safe: returns the last user message verbatim on error.
-    """
+    """Returns a self-contained web search query for the last user message.
+    On any error, falls back to the last user message verbatim."""
     if not messages:
         return ""
     fallback = _last_user_message(messages)
     try:
-        recent = messages[-6:]
         client = ol.Client(host=host, timeout=30.0)
         response = client.chat(
             model=model,
             messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a search query writer. Given a conversation, "
-                        "write a single concise web search query that retrieves the "
-                        "information needed to answer the user's most recent message. "
-                        "RULES: "
-                        "(1) Make the query SELF-CONTAINED — resolve pronouns and references "
-                        "using earlier context (entities, locations, dates, topics). "
-                        "(2) Include DOMAIN keywords that match the user's intent, to avoid "
-                        "irrelevant matches on proper nouns: "
-                        "'weather forecast' for weather, 'news' or specific event type for current events, "
-                        "'review' for products, 'recipe' for food, 'lyrics' for songs, "
-                        "'results' or 'standings' for sports, 'price' for shopping. "
-                        "(3) Prefer English keywords for global topics; keep proper nouns in the "
-                        "original script. "
-                        "(4) Output ONLY the query text — no quotes, no prefix, no explanation, "
-                        "no newlines."
-                    ),
-                },
-                *recent,
-                {
-                    "role": "user",
-                    "content": "Write the search query for my most recent message above.",
-                },
+                {"role": "system", "content": prompts.QUERY_REFORMULATOR},
+                *messages[-6:],
+                {"role": "user", "content": prompts.REFORMULATOR_USER_HINT},
             ],
             stream=False,
             options={"temperature": 0},
@@ -65,39 +48,20 @@ def extract_facts(
     model: str,
     existing_facts: list[str],
 ) -> list[str]:
-    """
-    Reads the latest exchange and returns NEW persistent facts about the user.
-    Returns [] on error or if nothing genuinely new was revealed.
-    """
+    """Returns NEW persistent facts about the user, or []."""
     if not messages:
         return []
     try:
-        existing_block = (
-            "\n".join(f"- {f}" for f in existing_facts) if existing_facts else "(none yet)"
-        )
         client = ol.Client(host=host, timeout=30.0)
         response = client.chat(
             model=model,
             messages=[
                 {
                     "role": "system",
-                    "content": (
-                        "You are a memory extractor for a chat app. Read the conversation "
-                        "below and extract any NEW persistent facts the user revealed about "
-                        "THEMSELVES: name, location, age, work, family, hobbies, preferences, "
-                        "dietary needs, opinions, ongoing projects. "
-                        "STRICT RULES:\n"
-                        "1. Skip ephemeral things (current mood, today's plans, one-off questions, "
-                        "weather they asked about, news they read).\n"
-                        "2. Skip anything already in 'Already known' below.\n"
-                        "3. Only facts about the USER, not about external entities they discussed.\n"
-                        "4. Each fact: one short declarative sentence in the user's language.\n"
-                        "5. If nothing genuinely new and persistent, output exactly: NONE\n\n"
-                        "Already known facts:\n" + existing_block
-                    ),
+                    "content": prompts.fact_extractor_system(existing_facts),
                 },
                 *messages[-6:],
-                {"role": "user", "content": "Extract new persistent facts about me now. Output bullet list or NONE."},
+                {"role": "user", "content": prompts.FACT_EXTRACTOR_USER_HINT},
             ],
             stream=False,
             options={"temperature": 0},
@@ -108,7 +72,8 @@ def extract_facts(
         facts = []
         for line in text.splitlines():
             line = line.strip().lstrip("-•*").strip()
-            if line and line.upper() != "NONE" and len(line) < 300:
+            # Filter out empty, NONE, banal echoes, or absurdly long lines
+            if line and line.upper() != "NONE" and 3 < len(line) < 300:
                 facts.append(line)
         return facts
     except Exception as e:
@@ -118,30 +83,13 @@ def extract_facts(
 
 
 def needs_search(user_message: str, host: str, model: str) -> bool:
-    """
-    Asks the LLM whether web search is needed. Fail-safe: returns False on error.
-    """
+    """Asks the LLM whether web search is needed. False on any error."""
     try:
         client = ol.Client(host=host, timeout=30.0)
         response = client.chat(
             model=model,
             messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a routing assistant for a chat app. "
-                        "The main assistant ALREADY KNOWS: the current date and time, "
-                        "the user's location, and general knowledge up to its training cutoff. "
-                        "Reply YES only if the user's message needs FRESH information from the web "
-                        "that the assistant cannot already answer — for example: today's news, "
-                        "live scores, current prices, recent events, specific facts that "
-                        "post-date the model's training, or content from a specific webpage. "
-                        "Reply NO for: simple time/date/location questions, general knowledge, "
-                        "coding help, definitions, opinions, math, translation, summarization "
-                        "of provided text, or anything the assistant can answer from its training. "
-                        "Reply with exactly one word: YES or NO."
-                    ),
-                },
+                {"role": "system", "content": prompts.ROUTER_NEEDS_SEARCH},
                 {"role": "user", "content": user_message},
             ],
             stream=False,

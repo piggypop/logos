@@ -13,6 +13,7 @@ import image_workflows
 import memory as mem
 import ollama_client
 import open_notebook_client
+import prompts
 import search_providers
 import tool_router
 import url_fetcher
@@ -35,16 +36,23 @@ def _extract_facts_bg(messages: list[dict], c: dict):
         sys.stderr.flush()
 
 
-def _system_context(c: dict) -> str:
+def _build_system_prompt(
+    c: dict,
+    sources_block: str = "",
+    has_notebook: bool = False,
+) -> str:
+    """Compose the final system message via the central prompt module."""
     now = datetime.now().astimezone()
-    parts = [f"Current date and time: {now.strftime('%A, %d %B %Y, %H:%M %Z')}"]
-    loc = (c.get("user_location") or "").strip()
-    if loc:
-        parts.append(f"User location: {loc}")
-    mem_block = mem.format_for_prompt(mem.load())
-    if mem_block:
-        parts.append(mem_block)
-    return "\n\n".join(parts)
+    date_line = f"Current date and time: {now.strftime('%A, %d %B %Y, %H:%M %Z')}"
+    return prompts.compose_system_prompt(
+        user_system_prompt=c.get("system_prompt") or "",
+        date_line=date_line,
+        location=(c.get("user_location") or "").strip(),
+        memory_facts=mem.load(),
+        has_sources=bool(sources_block),
+        has_notebook=has_notebook,
+        sources_block=sources_block,
+    )
 
 if getattr(sys, "frozen", False):
     FRONTEND_DIR = os.path.join(sys._MEIPASS, "frontend")
@@ -438,9 +446,6 @@ def chat():
                     yield f"data: {json.dumps({'type': 'remembered', 'fact': remember_text})}\n\n"
                     sys.stdout.flush()
 
-            # Build context AFTER any manual memory add (so it's included)
-            sys_ctx = _system_context(c)
-
             # ── Active notebook (Open Notebook) ──────────
             notebook_sources: list[dict] = []
             active_nb_id = c.get("active_notebook_id") or ""
@@ -491,13 +496,15 @@ def chat():
                 yield f"data: {json.dumps({'type': 'sources', 'query': query, 'sources': all_sources})}\n\n"
                 sys.stdout.flush()
 
-            # ── System prompt ────────────────────────────
-            if all_sources:
-                context_str = search_providers.format_as_context(all_sources)
-                base = c["search_system_prompt"] + "\n\n" + context_str
-            else:
-                base = c["system_prompt"]
-            system_prompt = sys_ctx + "\n\n" + base
+            # ── System prompt (composed via prompts module) ──
+            sources_block = (
+                search_providers.format_as_context(all_sources) if all_sources else ""
+            )
+            system_prompt = _build_system_prompt(
+                c,
+                sources_block=sources_block,
+                has_notebook=bool(notebook_sources),
+            )
 
             # ── Inject attachments (text inline, images via Ollama images field)
             ollama_messages = file_extractor.build_ollama_messages(messages)
