@@ -55,9 +55,13 @@ def _migrate_legacy():
     shutil.copy2(_LEGACY_PATH, CONFIG_PATH)
 
 
-_OLD_DEFAULT_SYSTEM_PROMPT = (
-    "You are a helpful assistant. Answer in the same language the user writes in."
-)
+# Every time MAIN_SYSTEM_PROMPT (prompts.py) changes, append the previous
+# value to this list so existing users get auto-upgraded on next load().
+# Custom (non-default) prompts are never touched.
+_LEGACY_DEFAULT_SYSTEM_PROMPTS: list[str] = [
+    # v1.1 era default (before v1.2.0 hardened prompt)
+    "You are a helpful assistant. Answer in the same language the user writes in.",
+]
 
 
 def load() -> dict:
@@ -68,9 +72,11 @@ def load() -> dict:
         # one-time field rename
         if "searxng_results_count" in data and "search_results_count" not in data:
             data["search_results_count"] = data.pop("searxng_results_count")
-        # Upgrade users on the well-known old default to the new hardened prompt.
+        # Upgrade users on known legacy defaults to the current hardened prompt.
         # Custom prompts are preserved untouched.
-        if (data.get("system_prompt") or "").strip() == _OLD_DEFAULT_SYSTEM_PROMPT:
+        if (data.get("system_prompt") or "").strip() in {
+            p.strip() for p in _LEGACY_DEFAULT_SYSTEM_PROMPTS
+        }:
             data["system_prompt"] = _prompts.MAIN_SYSTEM_PROMPT
         return {**DEFAULTS, **data}
     return DEFAULTS.copy()
