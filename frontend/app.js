@@ -228,7 +228,18 @@ function attachMessageActions(msgEl) {
   regenBtn.textContent = "↻ Regenerate";
   regenBtn.onclick = () => regenerateFromMessage(msgEl);
 
-  bar.append(copyBtn, regenBtn);
+  const noteBtn = document.createElement("button");
+  noteBtn.className = "msg-action-btn";
+  noteBtn.textContent = "📝 Note";
+  noteBtn.title = "Save this answer as a note";
+  noteBtn.onclick = async () => {
+    const content = getAssistantContentFor(msgEl);
+    const question = getQuestionFor(msgEl);
+    const sources = getSourcesFor(msgEl);
+    await takeNote(question, content, sources, noteBtn);
+  };
+
+  bar.append(copyBtn, regenBtn, noteBtn);
   msgEl.appendChild(bar);
 }
 
@@ -243,6 +254,79 @@ function getAssistantContentFor(msgEl) {
     }
   }
   return "";
+}
+
+function getQuestionFor(msgEl) {
+  // Find the user message immediately before this assistant message
+  const all = [...messagesEl.querySelectorAll(".msg.assistant")];
+  const idx = all.indexOf(msgEl);
+  let assistantCount = -1;
+  for (let i = 0; i < conversationHistory.length; i++) {
+    if (conversationHistory[i].role === "assistant") {
+      assistantCount++;
+      if (assistantCount === idx) {
+        // Walk backwards to find the preceding user message
+        for (let j = i - 1; j >= 0; j--) {
+          if (conversationHistory[j].role === "user") {
+            return conversationHistory[j].content || "";
+          }
+        }
+        return "";
+      }
+    }
+  }
+  return "";
+}
+
+function getSourcesFor(msgEl) {
+  const all = [...messagesEl.querySelectorAll(".msg.assistant")];
+  const idx = all.indexOf(msgEl);
+  let assistantCount = -1;
+  for (let i = 0; i < conversationHistory.length; i++) {
+    if (conversationHistory[i].role === "assistant") {
+      assistantCount++;
+      if (assistantCount === idx) {
+        return conversationHistory[i].sources || [];
+      }
+    }
+  }
+  return [];
+}
+
+async function takeNote(question, answer, sources, btnEl) {
+  if (!question || !answer) return;
+  try {
+    const resp = await fetch(`${API}/api/notes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question,
+        answer,
+        sources: sources || [],
+        chat_id: currentChatId || "",
+        model: currentConfig.ollama_model || "",
+      }),
+    });
+    if (resp.ok) {
+      btnEl.textContent = "✓ Noted";
+      btnEl.classList.add("flash");
+      setTimeout(() => {
+        btnEl.textContent = "📝 Note";
+        btnEl.classList.remove("flash");
+      }, 1200);
+    } else {
+      btnEl.textContent = "✗ Failed";
+      setTimeout(() => {
+        btnEl.textContent = "📝 Note";
+      }, 1200);
+    }
+  } catch (e) {
+    console.error("Take note failed:", e);
+    btnEl.textContent = "✗ Failed";
+    setTimeout(() => {
+      btnEl.textContent = "📝 Note";
+    }, 1200);
+  }
 }
 
 async function regenerateFromMessage(msgEl) {
