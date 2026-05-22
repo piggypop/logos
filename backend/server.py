@@ -583,7 +583,7 @@ def chat():
                 c["ollama_model"],
                 system_prompt,
                 c["ollama_host"],
-                c["temperature"],
+                cfg.effective(c, "temperature", c["ollama_model"]),
             ):
                 assistant_buffer.append(token)
                 yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"

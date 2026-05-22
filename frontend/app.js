@@ -1,29 +1,29 @@
 // ── State ───────────────────────────────────────────────────────────────────
 const API = "";
-let conversationHistory = [];  // [{role, content, attachments?}, ...]
+let conversationHistory = []; // [{role, content, attachments?}, ...]
 let isStreaming = false;
 let currentConfig = {};
 let currentChatId = null;
-let pendingAttachments = [];   // staged for next send
-let forceSearchMode = false;   // 🔍 toggle
+let pendingAttachments = []; // staged for next send
+let forceSearchMode = false; // 🔍 toggle
 
 // ── DOM Refs ─────────────────────────────────────────────────────────────────
-const messagesEl    = document.getElementById("messages");
-const userInput     = document.getElementById("user-input");
-const btnSend       = document.getElementById("btn-send");
-const btnSearch     = document.getElementById("btn-search");
-const btnAttach     = document.getElementById("btn-attach");
-const btnImage      = document.getElementById("btn-image");
+const messagesEl = document.getElementById("messages");
+const userInput = document.getElementById("user-input");
+const btnSend = document.getElementById("btn-send");
+const btnSearch = document.getElementById("btn-search");
+const btnAttach = document.getElementById("btn-attach");
+const btnImage = document.getElementById("btn-image");
 const attachmentsBar = document.getElementById("attachments-bar");
-const btnNewChat    = document.getElementById("btn-new-chat");
-const btnSettings   = document.getElementById("btn-settings");
+const btnNewChat = document.getElementById("btn-new-chat");
+const btnSettings = document.getElementById("btn-settings");
 const btnSidebarToggle = document.getElementById("btn-sidebar-toggle");
-const btnSidebarClose  = document.getElementById("btn-sidebar-close");
-const sidebar       = document.getElementById("sidebar");
-const chatListEl    = document.getElementById("chat-list");
-const modelBadge    = document.getElementById("model-badge");
+const btnSidebarClose = document.getElementById("btn-sidebar-close");
+const sidebar = document.getElementById("sidebar");
+const chatListEl = document.getElementById("chat-list");
+const modelBadge = document.getElementById("model-badge");
 const searchIndicator = document.getElementById("search-indicator");
-const searchLabel   = document.getElementById("search-label");
+const searchLabel = document.getElementById("search-label");
 
 // ── Init ─────────────────────────────────────────────────────────────────────
 async function init() {
@@ -34,12 +34,12 @@ async function init() {
   marked.setOptions({
     breaks: true,
     gfm: true,
-    highlight: function(code, lang) {
+    highlight: function (code, lang) {
       if (lang && hljs.getLanguage(lang)) {
         return hljs.highlight(code, { language: lang }).value;
       }
       return hljs.highlightAuto(code).value;
-    }
+    },
   });
 
   await loadChatList();
@@ -59,10 +59,10 @@ async function loadConfig() {
 async function saveConfig(data) {
   await fetch(`${API}/api/config`, {
     method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify(data)
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
   });
-  currentConfig = {...currentConfig, ...data};
+  currentConfig = { ...currentConfig, ...data };
   modelBadge.textContent = currentConfig.ollama_model || "—";
 }
 
@@ -71,8 +71,8 @@ async function sendMessage(forceSearch = false) {
   const text = userInput.value.trim();
   if ((!text && !pendingAttachments.length) || isStreaming) return;
 
-  const validAttachments = pendingAttachments.filter(a => !a.error);
-  const userMsg = {role: "user", content: text};
+  const validAttachments = pendingAttachments.filter((a) => !a.error);
+  const userMsg = { role: "user", content: text };
   if (validAttachments.length) userMsg.attachments = validAttachments;
 
   conversationHistory.push(userMsg);
@@ -96,22 +96,22 @@ async function streamResponse(forceSearch = false) {
   try {
     const response = await fetch(`${API}/api/chat`, {
       method: "POST",
-      headers: {"Content-Type": "application/json"},
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         messages: conversationHistory,
-        force_search: forceSearch
-      })
+        force_search: forceSearch,
+      }),
     });
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder("utf-8");
 
     while (true) {
-      const {done, value} = await reader.read();
+      const { done, value } = await reader.read();
       if (done) break;
 
       // {stream: true} keeps partial multi-byte UTF-8 chars between reads
-      sseLineBuffer += decoder.decode(value, {stream: true});
+      sseLineBuffer += decoder.decode(value, { stream: true });
       const lines = sseLineBuffer.split("\n");
       // last element may be incomplete — hold it for next iteration
       sseLineBuffer = lines.pop();
@@ -127,39 +127,38 @@ async function streamResponse(forceSearch = false) {
 
         if (event.type === "searching") {
           showIndicator("Searching…");
-
         } else if (event.type === "loading_notebook") {
           showIndicator("Loading notebook…");
-
         } else if (event.type === "fetching_urls") {
           const n = (event.urls || []).length;
           showIndicator(n === 1 ? "Reading page…" : `Reading ${n} pages…`);
-
         } else if (event.type === "remembered") {
           showIndicator(`✓ Saved to memory`);
           setTimeout(hideIndicator, 1500);
-
         } else if (event.type === "sources") {
           sources = event.sources || [];
-
         } else if (event.type === "token") {
           hideIndicator();
           buffer += event.content;
           assistantBubble.innerHTML = escapeHtml(buffer);
           assistantBubble.classList.add("streaming-cursor");
           scrollToBottom();
-
         } else if (event.type === "done") {
           assistantBubble.innerHTML = marked.parse(buffer);
           assistantBubble.classList.remove("streaming-cursor");
-          assistantBubble.querySelectorAll("pre code").forEach(el => hljs.highlightElement(el));
-          conversationHistory.push({role: "assistant", content: buffer, sources});
+          assistantBubble
+            .querySelectorAll("pre code")
+            .forEach((el) => hljs.highlightElement(el));
+          conversationHistory.push({
+            role: "assistant",
+            content: buffer,
+            sources,
+          });
           const msgEl = assistantBubble.closest(".msg");
           if (sources.length) renderSources(msgEl, sources);
           attachMessageActions(msgEl);
           scrollToBottom();
           await saveCurrentChat();
-
         } else if (event.type === "error") {
           assistantBubble.innerHTML = `⚠ ${escapeHtml(event.message)}`;
           assistantBubble.closest(".msg").classList.add("error");
@@ -215,7 +214,10 @@ function attachMessageActions(msgEl) {
       await navigator.clipboard.writeText(content);
       copyBtn.textContent = "✓ Copied";
       copyBtn.classList.add("flash");
-      setTimeout(() => { copyBtn.textContent = "⎘ Copy"; copyBtn.classList.remove("flash"); }, 1200);
+      setTimeout(() => {
+        copyBtn.textContent = "⎘ Copy";
+        copyBtn.classList.remove("flash");
+      }, 1200);
     } catch (e) {
       console.error("Copy failed:", e);
     }
@@ -250,11 +252,15 @@ async function regenerateFromMessage(msgEl) {
   if (targetIdx === -1) return;
 
   // find corresponding index in conversationHistory
-  let count = -1, historyIdx = -1;
+  let count = -1,
+    historyIdx = -1;
   for (let i = 0; i < conversationHistory.length; i++) {
     if (conversationHistory[i].role === "assistant") {
       count++;
-      if (count === targetIdx) { historyIdx = i; break; }
+      if (count === targetIdx) {
+        historyIdx = i;
+        break;
+      }
     }
   }
   if (historyIdx === -1) return;
@@ -309,7 +315,7 @@ function renderMessageAttachments(attachments) {
 }
 
 function categoryIcon(category) {
-  return {image: "🖼", audio: "🎵", video: "🎞"}[category] || "📄";
+  return { image: "🖼", audio: "🎵", video: "🎞" }[category] || "📄";
 }
 
 function formatBytes(n) {
@@ -372,7 +378,11 @@ function autoResizeTextarea() {
 // ── Attachments ──────────────────────────────────────────────────────────────
 async function pickAttachments() {
   if (isStreaming) return;
-  if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.pick_files) {
+  if (
+    !window.pywebview ||
+    !window.pywebview.api ||
+    !window.pywebview.api.pick_files
+  ) {
     alert("File picker requires the desktop app (pywebview not available).");
     return;
   }
@@ -404,7 +414,9 @@ function renderAttachmentsBar() {
     const name = document.createElement("span");
     name.className = "attach-chip-name";
     name.textContent = a.filename;
-    name.title = a.error ? a.error : `${a.category} · ${formatBytes(a.size || 0)}`;
+    name.title = a.error
+      ? a.error
+      : `${a.category} · ${formatBytes(a.size || 0)}`;
 
     const meta = document.createElement("span");
     meta.className = "attach-chip-meta";
@@ -443,8 +455,8 @@ async function saveCurrentChat() {
   try {
     await fetch(`${API}/api/chats/${currentChatId}`, {
       method: "PUT",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({messages: conversationHistory})
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages: conversationHistory }),
     });
     await loadChatList();
   } catch (e) {
@@ -465,10 +477,12 @@ async function loadChatList() {
 function groupChatsByDate(chats) {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
-  const weekAgo = new Date(today); weekAgo.setDate(today.getDate() - 7);
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  const weekAgo = new Date(today);
+  weekAgo.setDate(today.getDate() - 7);
 
-  const groups = {Today: [], Yesterday: [], "Last 7 days": [], Older: []};
+  const groups = { Today: [], Yesterday: [], "Last 7 days": [], Older: [] };
   for (const c of chats) {
     const d = new Date(c.updated_at);
     if (d >= today) groups.Today.push(c);
@@ -516,17 +530,26 @@ function renderChatEntry(chat) {
   const renameBtn = document.createElement("button");
   renameBtn.textContent = "✎";
   renameBtn.title = "Rename";
-  renameBtn.onclick = (e) => { e.stopPropagation(); renameChat(chat.id, chat.title); };
+  renameBtn.onclick = (e) => {
+    e.stopPropagation();
+    renameChat(chat.id, chat.title);
+  };
 
   const exportBtn = document.createElement("button");
   exportBtn.textContent = "↓";
   exportBtn.title = "Export JSON";
-  exportBtn.onclick = (e) => { e.stopPropagation(); exportChat(chat.id); };
+  exportBtn.onclick = (e) => {
+    e.stopPropagation();
+    exportChat(chat.id);
+  };
 
   const delBtn = document.createElement("button");
   delBtn.textContent = "✕";
   delBtn.title = "Delete";
-  delBtn.onclick = (e) => { e.stopPropagation(); deleteChat(chat.id, chat.title); };
+  delBtn.onclick = (e) => {
+    e.stopPropagation();
+    deleteChat(chat.id, chat.title);
+  };
 
   actions.append(renameBtn, exportBtn, delBtn);
   entry.append(title, actions);
@@ -559,7 +582,9 @@ async function loadChat(chatId) {
         }
         const bubble = createAssistantBubble();
         bubble.innerHTML = marked.parse(m.content || "");
-        bubble.querySelectorAll("pre code").forEach(el => hljs.highlightElement(el));
+        bubble
+          .querySelectorAll("pre code")
+          .forEach((el) => hljs.highlightElement(el));
         const msgEl = bubble.closest(".msg");
         if (m.sources && m.sources.length) renderSources(msgEl, m.sources);
         attachMessageActions(msgEl);
@@ -580,8 +605,8 @@ async function renameChat(chatId, oldTitle) {
   try {
     await fetch(`${API}/api/chats/${chatId}/rename`, {
       method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({title: trimmed})
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: trimmed }),
     });
     await loadChatList();
   } catch (e) {
@@ -591,7 +616,11 @@ async function renameChat(chatId, oldTitle) {
 
 async function exportChat(chatId) {
   // Native save dialog via pywebview js_api (works inside the desktop app)
-  if (window.pywebview && window.pywebview.api && window.pywebview.api.export_chat) {
+  if (
+    window.pywebview &&
+    window.pywebview.api &&
+    window.pywebview.api.export_chat
+  ) {
     try {
       const result = await window.pywebview.api.export_chat(chatId);
       if (result && result.ok === false && !result.cancelled) {
@@ -607,8 +636,12 @@ async function exportChat(chatId) {
   try {
     const r = await fetch(`${API}/api/chats/${chatId}`);
     const data = await r.json();
-    const safeTitle = (data.title || "chat").replace(/[^\w\-]+/g, "_").slice(0, 60);
-    const blob = new Blob([JSON.stringify(data, null, 2)], {type: "application/json"});
+    const safeTitle = (data.title || "chat")
+      .replace(/[^\w\-]+/g, "_")
+      .slice(0, 60);
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: "application/json",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -625,7 +658,7 @@ async function exportChat(chatId) {
 async function deleteChat(chatId, title) {
   if (!confirm(`Delete "${title || "this chat"}"?`)) return;
   try {
-    await fetch(`${API}/api/chats/${chatId}`, {method: "DELETE"});
+    await fetch(`${API}/api/chats/${chatId}`, { method: "DELETE" });
     if (currentChatId === chatId) newChat();
     await loadChatList();
   } catch (e) {
@@ -644,25 +677,32 @@ async function openSettings() {
   const c = currentConfig;
 
   document.getElementById("s-ollama-host").value = c.ollama_host || "";
-  document.getElementById("s-search-provider").value = c.search_provider || "ddg";
+  document.getElementById("s-search-provider").value =
+    c.search_provider || "ddg";
   document.getElementById("s-brave-api-key").value = c.brave_api_key || "";
   document.getElementById("s-searxng-url").value = c.searxng_url || "";
-  document.getElementById("s-results-count").value = c.search_results_count || c.searxng_results_count || 5;
+  document.getElementById("s-results-count").value =
+    c.search_results_count || c.searxng_results_count || 5;
   document.getElementById("s-auto-search").checked = !!c.auto_search_enabled;
   document.getElementById("s-user-location").value = c.user_location || "";
   document.getElementById("s-notebook-url").value = c.open_notebook_url || "";
-  document.getElementById("s-notebook-ui-url").value = c.open_notebook_ui_url || "";
+  document.getElementById("s-notebook-ui-url").value =
+    c.open_notebook_ui_url || "";
 
   // ComfyUI fields
   document.getElementById("s-comfyui-url").value = c.comfyui_url || "";
-  document.getElementById("s-comfyui-workflow").value = c.comfyui_workflow || "sdxl-default";
-  document.getElementById("s-comfyui-custom-workflow").value = c.comfyui_custom_workflow || "";
+  document.getElementById("s-comfyui-workflow").value =
+    c.comfyui_workflow || "sdxl-default";
+  document.getElementById("s-comfyui-custom-workflow").value =
+    c.comfyui_custom_workflow || "";
   document.getElementById("s-comfyui-steps").value = c.comfyui_steps ?? 30;
   document.getElementById("s-comfyui-cfg").value = c.comfyui_cfg ?? 7.5;
   document.getElementById("s-comfyui-width").value = c.comfyui_width ?? 1024;
   document.getElementById("s-comfyui-height").value = c.comfyui_height ?? 1024;
-  document.getElementById("s-comfyui-negative").value = c.comfyui_negative_prompt || "";
-  document.getElementById("s-comfyui-commentary").checked = !!c.comfyui_post_commentary;
+  document.getElementById("s-comfyui-negative").value =
+    c.comfyui_negative_prompt || "";
+  document.getElementById("s-comfyui-commentary").checked =
+    !!c.comfyui_post_commentary;
   updateComfyuiCustomVisibility();
 
   updateProviderFieldsVisibility();
@@ -670,7 +710,16 @@ async function openSettings() {
   await refreshComfyui(c);
   document.getElementById("s-system-prompt").value = c.system_prompt || "";
   document.getElementById("s-temperature").value = c.temperature || 0.7;
-  document.getElementById("s-temperature-val").textContent = c.temperature || 0.7;
+  document.getElementById("s-temperature-val").textContent =
+    c.temperature || 0.7;
+
+  // Per-model override state
+  updateTempOverrideUI();
+  document.getElementById("s-conservative-mode").checked = !!(
+    c.model_overrides &&
+    c.model_overrides[c.ollama_model] &&
+    c.model_overrides[c.ollama_model].temperature !== undefined
+  );
 
   // Load models
   await refreshModels(c.ollama_model);
@@ -725,7 +774,7 @@ function renderMemoryItem(fact) {
   del.title = "Delete";
   del.onclick = async () => {
     if (!confirm(`Delete: "${fact.text}"?`)) return;
-    await fetch(`${API}/api/memory/${fact.id}`, {method: "DELETE"});
+    await fetch(`${API}/api/memory/${fact.id}`, { method: "DELETE" });
     await loadMemory();
   };
 
@@ -763,29 +812,43 @@ async function saveSettings() {
     search_provider: document.getElementById("s-search-provider").value,
     brave_api_key: document.getElementById("s-brave-api-key").value.trim(),
     searxng_url: document.getElementById("s-searxng-url").value.trim(),
-    search_results_count: parseInt(document.getElementById("s-results-count").value),
+    search_results_count: parseInt(
+      document.getElementById("s-results-count").value,
+    ),
     auto_search_enabled: document.getElementById("s-auto-search").checked,
     user_location: document.getElementById("s-user-location").value.trim(),
     open_notebook_url: document.getElementById("s-notebook-url").value.trim(),
-    open_notebook_ui_url: document.getElementById("s-notebook-ui-url").value.trim(),
+    open_notebook_ui_url: document
+      .getElementById("s-notebook-ui-url")
+      .value.trim(),
     active_notebook_id: document.getElementById("s-notebook-active").value,
-    active_notebook_name: document.getElementById("s-notebook-active").options[
-      document.getElementById("s-notebook-active").selectedIndex
-    ]?.dataset.name || "",
+    active_notebook_name:
+      document.getElementById("s-notebook-active").options[
+        document.getElementById("s-notebook-active").selectedIndex
+      ]?.dataset.name || "",
     comfyui_url: document.getElementById("s-comfyui-url").value.trim(),
     comfyui_workflow: document.getElementById("s-comfyui-workflow").value,
-    comfyui_custom_workflow: document.getElementById("s-comfyui-custom-workflow").value,
+    comfyui_custom_workflow: document.getElementById(
+      "s-comfyui-custom-workflow",
+    ).value,
     comfyui_checkpoint: document.getElementById("s-comfyui-checkpoint").value,
     comfyui_sampler: document.getElementById("s-comfyui-sampler").value,
     comfyui_scheduler: document.getElementById("s-comfyui-scheduler").value,
-    comfyui_steps: parseInt(document.getElementById("s-comfyui-steps").value) || 30,
-    comfyui_cfg: parseFloat(document.getElementById("s-comfyui-cfg").value) || 7.5,
-    comfyui_width: parseInt(document.getElementById("s-comfyui-width").value) || 1024,
-    comfyui_height: parseInt(document.getElementById("s-comfyui-height").value) || 1024,
-    comfyui_negative_prompt: document.getElementById("s-comfyui-negative").value,
-    comfyui_post_commentary: document.getElementById("s-comfyui-commentary").checked,
+    comfyui_steps:
+      parseInt(document.getElementById("s-comfyui-steps").value) || 30,
+    comfyui_cfg:
+      parseFloat(document.getElementById("s-comfyui-cfg").value) || 7.5,
+    comfyui_width:
+      parseInt(document.getElementById("s-comfyui-width").value) || 1024,
+    comfyui_height:
+      parseInt(document.getElementById("s-comfyui-height").value) || 1024,
+    comfyui_negative_prompt:
+      document.getElementById("s-comfyui-negative").value,
+    comfyui_post_commentary: document.getElementById("s-comfyui-commentary")
+      .checked,
     system_prompt: document.getElementById("s-system-prompt").value,
-    temperature: temp
+    temperature: hasTempOverride() ? currentConfig.temperature : temp,
+    model_overrides: currentConfig.model_overrides || {},
   });
   closeSettings();
 }
@@ -796,16 +859,28 @@ btnSearch.addEventListener("click", toggleForceSearch);
 btnAttach.addEventListener("click", pickAttachments);
 btnImage.addEventListener("click", openImageModal);
 
-document.getElementById("image-close").addEventListener("click", closeImageModal);
-document.getElementById("img-cancel").addEventListener("click", closeImageModal);
-document.getElementById("img-generate").addEventListener("click", generateImage);
+document
+  .getElementById("image-close")
+  .addEventListener("click", closeImageModal);
+document
+  .getElementById("img-cancel")
+  .addEventListener("click", closeImageModal);
+document
+  .getElementById("img-generate")
+  .addEventListener("click", generateImage);
 
-document.getElementById("s-comfyui-workflow").addEventListener("change", updateComfyuiCustomVisibility);
-document.getElementById("s-comfyui-connect").addEventListener("click", async () => {
-  await saveConfig({comfyui_url: document.getElementById("s-comfyui-url").value.trim()});
-  await refreshComfyui(currentConfig, {force: true});
-  await probeComfyuiOnce();
-});
+document
+  .getElementById("s-comfyui-workflow")
+  .addEventListener("change", updateComfyuiCustomVisibility);
+document
+  .getElementById("s-comfyui-connect")
+  .addEventListener("click", async () => {
+    await saveConfig({
+      comfyui_url: document.getElementById("s-comfyui-url").value.trim(),
+    });
+    await refreshComfyui(currentConfig, { force: true });
+    await probeComfyuiOnce();
+  });
 
 function toggleForceSearch() {
   forceSearchMode = !forceSearchMode;
@@ -819,39 +894,55 @@ btnSettings.addEventListener("click", openSettings);
 btnSidebarToggle.addEventListener("click", toggleSidebar);
 btnSidebarClose.addEventListener("click", toggleSidebar);
 
-document.getElementById("settings-close").addEventListener("click", closeSettings);
-document.getElementById("settings-cancel").addEventListener("click", closeSettings);
-document.getElementById("settings-save").addEventListener("click", saveSettings);
+document
+  .getElementById("settings-close")
+  .addEventListener("click", closeSettings);
+document
+  .getElementById("settings-cancel")
+  .addEventListener("click", closeSettings);
+document
+  .getElementById("settings-save")
+  .addEventListener("click", saveSettings);
 
 document.getElementById("s-refresh-models").addEventListener("click", () => {
   refreshModels(document.getElementById("s-model").value);
 });
 
-document.getElementById("s-memory-refresh").addEventListener("click", loadMemory);
+document
+  .getElementById("s-memory-refresh")
+  .addEventListener("click", loadMemory);
 
-document.getElementById("s-search-provider").addEventListener("change", updateProviderFieldsVisibility);
+document
+  .getElementById("s-search-provider")
+  .addEventListener("change", updateProviderFieldsVisibility);
 
 // ── Notebook (Open Notebook) ─────────────────────────────────────────────
-document.getElementById("s-notebook-connect").addEventListener("click", async () => {
-  // Persist URL before testing
-  const url = document.getElementById("s-notebook-url").value.trim();
-  await saveConfig({open_notebook_url: url});
-  await refreshNotebooks(document.getElementById("s-notebook-active").value);
-});
+document
+  .getElementById("s-notebook-connect")
+  .addEventListener("click", async () => {
+    // Persist URL before testing
+    const url = document.getElementById("s-notebook-url").value.trim();
+    await saveConfig({ open_notebook_url: url });
+    await refreshNotebooks(document.getElementById("s-notebook-active").value);
+  });
 
-document.getElementById("s-notebook-refresh").addEventListener("click", async () => {
-  await fetch(`${API}/api/notebooks/refresh`, {method: "POST"});
-  const id = document.getElementById("s-notebook-active").value;
-  await renderNotebookPreview(id);
-});
+document
+  .getElementById("s-notebook-refresh")
+  .addEventListener("click", async () => {
+    await fetch(`${API}/api/notebooks/refresh`, { method: "POST" });
+    const id = document.getElementById("s-notebook-active").value;
+    await renderNotebookPreview(id);
+  });
 
-document.getElementById("s-notebook-active").addEventListener("change", async () => {
-  const sel = document.getElementById("s-notebook-active");
-  const id = sel.value;
-  const name = sel.options[sel.selectedIndex]?.dataset.name || "";
-  await saveConfig({active_notebook_id: id, active_notebook_name: name});
-  await renderNotebookPreview(id);
-});
+document
+  .getElementById("s-notebook-active")
+  .addEventListener("change", async () => {
+    const sel = document.getElementById("s-notebook-active");
+    const id = sel.value;
+    const name = sel.options[sel.selectedIndex]?.dataset.name || "";
+    await saveConfig({ active_notebook_id: id, active_notebook_name: name });
+    await renderNotebookPreview(id);
+  });
 
 async function refreshNotebooks(selectedId) {
   const sel = document.getElementById("s-notebook-active");
@@ -860,7 +951,8 @@ async function refreshNotebooks(selectedId) {
   try {
     const r = await fetch(`${API}/api/notebooks`);
     const data = await r.json();
-    sel.innerHTML = '<option value="">— None (notebook integration off) —</option>';
+    sel.innerHTML =
+      '<option value="">— None (notebook integration off) —</option>';
     if (!data.ok) {
       status.textContent = "not reachable";
       status.style.color = "var(--error)";
@@ -889,7 +981,9 @@ async function refreshNotebooks(selectedId) {
 // ── ComfyUI ──────────────────────────────────────────────────────────────────
 function updateComfyuiCustomVisibility() {
   const v = document.getElementById("s-comfyui-workflow").value;
-  document.getElementById("s-comfyui-custom-wrap").classList.toggle("hidden", v !== "custom");
+  document
+    .getElementById("s-comfyui-custom-wrap")
+    .classList.toggle("hidden", v !== "custom");
 }
 
 function fillSelect(el, options, selected) {
@@ -917,7 +1011,7 @@ function fillSelect(el, options, selected) {
   }
 }
 
-async function refreshComfyui(c, {force = false} = {}) {
+async function refreshComfyui(c, { force = false } = {}) {
   const status = document.getElementById("s-comfyui-status");
   const ckptSel = document.getElementById("s-comfyui-checkpoint");
   const samplerSel = document.getElementById("s-comfyui-sampler");
@@ -925,14 +1019,24 @@ async function refreshComfyui(c, {force = false} = {}) {
   status.textContent = "checking…";
   status.style.color = "var(--muted)";
   try {
-    const r = await fetch(`${API}/api/comfyui/status${force ? "?refresh=1" : ""}`);
+    const r = await fetch(
+      `${API}/api/comfyui/status${force ? "?refresh=1" : ""}`,
+    );
     const data = await r.json();
     if (!data.ok) {
       status.textContent = data.error || "unreachable";
       status.style.color = "var(--error)";
       fillSelect(ckptSel, [], c.comfyui_checkpoint);
-      fillSelect(samplerSel, ["euler","euler_ancestral","dpmpp_2m","dpmpp_sde"], c.comfyui_sampler);
-      fillSelect(schedSel, ["normal","karras","exponential","sgm_uniform"], c.comfyui_scheduler);
+      fillSelect(
+        samplerSel,
+        ["euler", "euler_ancestral", "dpmpp_2m", "dpmpp_sde"],
+        c.comfyui_sampler,
+      );
+      fillSelect(
+        schedSel,
+        ["normal", "karras", "exponential", "sgm_uniform"],
+        c.comfyui_scheduler,
+      );
       btnImage.disabled = true;
       return;
     }
@@ -955,7 +1059,8 @@ async function probeComfyuiOnce() {
     const r = await fetch(`${API}/api/comfyui/status`);
     const data = await r.json();
     btnImage.disabled = !data.ok;
-    if (!data.ok) btnImage.title = "ComfyUI unreachable (check Settings → Image)";
+    if (!data.ok)
+      btnImage.title = "ComfyUI unreachable (check Settings → Image)";
     else btnImage.title = "Generate image (ComfyUI)";
   } catch (e) {
     btnImage.disabled = true;
@@ -963,8 +1068,8 @@ async function probeComfyuiOnce() {
 }
 
 // Image generation modal
-const imgOverlay  = document.getElementById("image-overlay");
-const imgPrompt   = document.getElementById("img-prompt");
+const imgOverlay = document.getElementById("image-overlay");
+const imgPrompt = document.getElementById("img-prompt");
 const imgNegative = document.getElementById("img-negative");
 const imgProgress = document.getElementById("img-progress");
 const imgGenerate = document.getElementById("img-generate");
@@ -972,7 +1077,7 @@ let imgGenerating = false;
 
 function openImageModal() {
   if (isStreaming || btnImage.disabled) return;
-  imgPrompt.value = userInput.value.trim();  // pre-fill with current input if any
+  imgPrompt.value = userInput.value.trim(); // pre-fill with current input if any
   imgNegative.value = "";
   imgProgress.textContent = "";
   imgGenerating = false;
@@ -982,7 +1087,7 @@ function openImageModal() {
 }
 
 function closeImageModal() {
-  if (imgGenerating) return;  // don't close mid-generation
+  if (imgGenerating) return; // don't close mid-generation
   imgOverlay.classList.add("hidden");
 }
 
@@ -997,27 +1102,31 @@ async function generateImage() {
   const chatIdAtStart = currentChatId;
   let imageResult = null;
   try {
-    const body = {prompt, chat_id: chatIdAtStart, overrides: {}};
+    const body = { prompt, chat_id: chatIdAtStart, overrides: {} };
     const neg = imgNegative.value.trim();
     if (neg) body.overrides.negative = neg;
     const resp = await fetch(`${API}/api/comfyui/generate`, {
       method: "POST",
-      headers: {"Content-Type": "application/json"},
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
     const reader = resp.body.getReader();
     const decoder = new TextDecoder("utf-8");
     let buf = "";
     while (true) {
-      const {done, value} = await reader.read();
+      const { done, value } = await reader.read();
       if (done) break;
-      buf += decoder.decode(value, {stream: true});
+      buf += decoder.decode(value, { stream: true });
       const lines = buf.split("\n");
       buf = lines.pop();
       for (const line of lines) {
         if (!line.startsWith("data: ")) continue;
         let ev;
-        try { ev = JSON.parse(line.slice(6)); } catch { continue; }
+        try {
+          ev = JSON.parse(line.slice(6));
+        } catch {
+          continue;
+        }
         if (ev.type === "queued") {
           imgProgress.textContent = "queued · waiting for worker…";
         } else if (ev.type === "progress") {
@@ -1097,8 +1206,8 @@ async function persistMessageToChat(chatId, msg) {
     const messages = (chat.messages || []).concat([msg]);
     await fetch(`${API}/api/chats/${chatId}`, {
       method: "PUT",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({messages}),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages }),
     });
     await loadChatList();
   } catch (e) {
@@ -1179,7 +1288,9 @@ async function renderNotebookPreview(notebookId) {
   }
   info.textContent = "loading…";
   try {
-    const r = await fetch(`${API}/api/notebooks/${encodeURIComponent(notebookId)}/preview`);
+    const r = await fetch(
+      `${API}/api/notebooks/${encodeURIComponent(notebookId)}/preview`,
+    );
     const data = await r.json();
     if (!data.ok) {
       info.textContent = data.error || "could not load";
@@ -1198,33 +1309,142 @@ async function renderNotebookPreview(notebookId) {
 
 function updateProviderFieldsVisibility() {
   const provider = document.getElementById("s-search-provider").value;
-  document.getElementById("s-provider-brave").classList.toggle("hidden", provider !== "brave");
-  document.getElementById("s-provider-searxng").classList.toggle("hidden", provider !== "searxng");
+  document
+    .getElementById("s-provider-brave")
+    .classList.toggle("hidden", provider !== "brave");
+  document
+    .getElementById("s-provider-searxng")
+    .classList.toggle("hidden", provider !== "searxng");
 }
 
 // Settings tabs
-document.querySelectorAll(".settings-tab").forEach(tab => {
+document.querySelectorAll(".settings-tab").forEach((tab) => {
   tab.addEventListener("click", () => {
     const target = tab.dataset.tab;
-    document.querySelectorAll(".settings-tab").forEach(t => t.classList.toggle("active", t === tab));
-    document.querySelectorAll(".settings-tab-panel").forEach(p =>
-      p.classList.toggle("active", p.dataset.panel === target)
-    );
-    try { localStorage.setItem("logos.lastSettingsTab", target); } catch (_) {}
+    document
+      .querySelectorAll(".settings-tab")
+      .forEach((t) => t.classList.toggle("active", t === tab));
+    document
+      .querySelectorAll(".settings-tab-panel")
+      .forEach((p) => p.classList.toggle("active", p.dataset.panel === target));
+    try {
+      localStorage.setItem("logos.lastSettingsTab", target);
+    } catch (_) {}
   });
 });
 
 // Restore last opened tab when Settings opens
 function restoreSettingsTab() {
   let tab = "model";
-  try { tab = localStorage.getItem("logos.lastSettingsTab") || "model"; } catch (_) {}
+  try {
+    tab = localStorage.getItem("logos.lastSettingsTab") || "model";
+  } catch (_) {}
   const btn = document.querySelector(`.settings-tab[data-tab="${tab}"]`);
   if (btn) btn.click();
 }
 
-document.getElementById("s-temperature").addEventListener("input", function() {
-  document.getElementById("s-temperature-val").textContent = this.value;
+// Restore last opened tab when Settings opens - event listener
+const tabs = document.querySelectorAll(".settings-tab");
+tabs.forEach((tab) => {
+  tab.addEventListener("click", () => {
+    document
+      .querySelectorAll(".settings-tab")
+      .forEach((t) => t.classList.toggle("active", t === tab));
+    document
+      .querySelectorAll(".settings-tab-panel")
+      .forEach((p) =>
+        p.classList.toggle("active", p.dataset.panel === tab.dataset.tab),
+      );
+    try {
+      localStorage.setItem("logos.lastSettingsTab", tab.dataset.tab);
+    } catch (_) {}
+  });
 });
+
+// ── D1/D2: Per-model temperature overrides ──────────────────────────────────
+function getSelectedModel() {
+  return document.getElementById("s-model").value;
+}
+
+function updateTempOverrideUI() {
+  const model = getSelectedModel();
+  const overrides = currentConfig.model_overrides || {};
+  const hasOverride =
+    overrides[model] && overrides[model].temperature !== undefined;
+  const modeEl = document.getElementById("s-temp-mode");
+  const tempSlider = document.getElementById("s-temperature");
+  const tempVal = document.getElementById("s-temperature-val");
+
+  if (hasOverride) {
+    modeEl.textContent = `per-model: ${model}`;
+    modeEl.style.color = "var(--accent)";
+    tempSlider.value = overrides[model].temperature;
+    tempVal.textContent = overrides[model].temperature;
+  } else {
+    modeEl.textContent = "global";
+    modeEl.style.color = "";
+    tempSlider.value = currentConfig.temperature || 0.7;
+    tempVal.textContent = currentConfig.temperature || 0.7;
+  }
+  document.getElementById("s-conservative-mode").checked = hasOverride;
+}
+
+function hasTempOverride() {
+  const model = getSelectedModel();
+  const overrides = currentConfig.model_overrides || {};
+  return overrides[model] && overrides[model].temperature !== undefined;
+}
+
+function toggleTempOverride() {
+  const model = getSelectedModel();
+  if (!currentConfig.model_overrides) currentConfig.model_overrides = {};
+  const overrides = currentConfig.model_overrides;
+  const hasOverride =
+    overrides[model] && overrides[model].temperature !== undefined;
+
+  if (hasOverride) {
+    // Switch back to global: remove override for this model
+    delete overrides[model].temperature;
+    if (!Object.keys(overrides[model]).length) delete overrides[model];
+  } else {
+    // Switch to per-model: copy current global temperature as starting point
+    if (!overrides[model]) overrides[model] = {};
+    overrides[model].temperature = parseFloat(
+      document.getElementById("s-temperature").value,
+    );
+  }
+  updateTempOverrideUI();
+}
+
+// Event listeners for D1/D2
+const sTempToggle = document.getElementById("s-temp-toggle");
+if (sTempToggle) {
+  sTempToggle.addEventListener("click", toggleTempOverride);
+}
+
+document.getElementById("s-model").addEventListener("change", () => {
+  updateTempOverrideUI();
+});
+
+document
+  .getElementById("s-conservative-mode")
+  .addEventListener("change", function () {
+    const model = getSelectedModel();
+    if (!currentConfig.model_overrides) currentConfig.model_overrides = {};
+    if (this.checked) {
+      if (!currentConfig.model_overrides[model])
+        currentConfig.model_overrides[model] = {};
+      currentConfig.model_overrides[model].temperature = 0.4;
+    } else {
+      if (currentConfig.model_overrides[model]) {
+        delete currentConfig.model_overrides[model].temperature;
+        if (!Object.keys(currentConfig.model_overrides[model]).length) {
+          delete currentConfig.model_overrides[model];
+        }
+      }
+    }
+    updateTempOverrideUI();
+  });
 
 userInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) {

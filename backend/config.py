@@ -44,6 +44,9 @@ DEFAULTS = {
     # ~/.local/share/logos/debug/prompts.log on every chat turn (JSONL, rotated at ~5 MB).
     # Off by default — the log contains conversation history and memory facts.
     "debug_log_prompts": False,
+    # Per-model configuration overrides. Keys: model name, values: dict with
+    # override keys (e.g. {"temperature": 0.4}). Global config remains unchanged.
+    "model_overrides": {},
 }
 
 
@@ -86,3 +89,14 @@ def save(data: dict):
     CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
     with open(CONFIG_PATH, "w") as f:
         json.dump(data, f, indent=2)
+
+
+def effective(c: dict, key: str, model: str) -> Any:
+    """Return the per-model override for *key* if present, else the global value."""
+    from typing import Any
+
+    overrides = c.get("model_overrides", {})
+    model_cfg = overrides.get(model, {})
+    if key in model_cfg:
+        return model_cfg[key]
+    return c.get(key)
