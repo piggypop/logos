@@ -59,6 +59,7 @@ def _build_system_prompt(
     sources_block: str = "",
     has_notebook: bool = False,
     user_message: str = "",
+    source_quality_block: str = "",
 ) -> str:
     """Compose the final system message via the central prompt module."""
     now = datetime.now().astimezone()
@@ -77,6 +78,7 @@ def _build_system_prompt(
         has_notebook=has_notebook,
         sources_block=sources_block,
         detected_language=detected_language,
+        source_quality_block=source_quality_block,
     )
 
 
@@ -529,9 +531,18 @@ def chat():
             sources_block = (
                 search_providers.format_as_context(all_sources) if all_sources else ""
             )
+
+            # ── Source quality summary (Phase C2) ──
+            source_quality_block = (
+                search_providers.source_quality_summary(all_sources)
+                if all_sources
+                else ""
+            )
+
             system_prompt = _build_system_prompt(
                 c,
                 sources_block=sources_block,
+                source_quality_block=source_quality_block,
                 has_notebook=bool(notebook_sources),
                 user_message=last_user_message,
             )

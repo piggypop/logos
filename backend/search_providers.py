@@ -6,6 +6,7 @@ Each backend returns the canonical shape:
 Selected via config key `search_provider`: 'ddg' (default) | 'brave' | 'searxng'.
 All backends are fail-safe — return [] on any error.
 """
+
 import sys
 
 import httpx
@@ -118,12 +119,46 @@ def _searxng(query: str, count: int, c: dict) -> list[dict]:
 
 
 def format_as_context(results: list[dict]) -> str:
-    """Canonical context formatter used for both URL fetches and search results."""
+    """Canonical context formatter used for both URL fetches and search results.
+
+    Sources with content shorter than THIN_THRESHOLD characters are tagged
+    as thin so the model knows they are snippets, not full articles.
+    """
+    THIN_THRESHOLD = 300  # chars; below this = snippet, not article body
+
     if not results:
         return ""
     lines = ["Web search results:\n"]
     for i, r in enumerate(results, 1):
-        lines.append(f"[{i}] {r.get('title', '')}")
+        content = r.get("content", "")
+        is_thin = len(content) < THIN_THRESHOLD
+        tag = " [THIN — snippet only, no article body]" if is_thin else ""
+        lines.append(f"[{i}] {r.get('title', '')}{tag}")
         lines.append(f"    URL: {r.get('url', '')}")
-        lines.append(f"    {r.get('content', '')}\n")
+        lines.append(f"    {content}\n")
     return "\n".join(lines)
+
+
+def source_quality_summary(results: list[dict]) -> str:
+    """Return a pre-source quality block, or empty string if all sources are substantial.
+
+    Tells the model how many sources are thin vs substantial BEFORE it reads them.
+    """
+    THIN_THRESHOLD = 300
+    if not results:
+        return ""
+
+    thin = sum(1 for r in results if len(r.get("content", "")) < THIN_THRESHOLD)
+    total = len(results)
+    substantial = total - thin
+
+    if thin == 0:
+        return ""  # All good, no warning needed
+
+    return (
+        f"## SOURCE QUALITY\n"
+        f"{thin} of {total} sources below are THIN (headlines/snippets only, "
+        f"no full article body). {substantial} have substantial content. "
+        f"Thin sources may not contain enough detail to answer the question. "
+        f"Do NOT fabricate facts that are not explicitly in the sources."
+    )

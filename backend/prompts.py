@@ -271,6 +271,7 @@ def compose_system_prompt(
     has_notebook: bool,
     sources_block: str,
     detected_language: str,
+    source_quality_block: str = "",
 ) -> str:
     """Assemble the final system message Logos sends to Ollama.
 
@@ -282,8 +283,9 @@ def compose_system_prompt(
       5. mode-specific addenda (search, notebook)
       6. date/time block repeated (near end, for small-model attention)
       7. language consistency rule
-      8. sources content
-      9. summary framing rule (only when sources present)
+      8. source quality summary
+      9. sources content
+      10. summary framing rule (only when sources present)
     """
     dt_block = date_block(date_info)
     parts: list[str] = [
@@ -308,6 +310,10 @@ def compose_system_prompt(
 
     # Language consistency rule (after 2nd date block, before sources)
     parts.append(language_rule(detected_language))
+
+    # Source quality summary (before sources, so model knows what to expect)
+    if source_quality_block:
+        parts.append(source_quality_block)
 
     if sources_block:
         parts.append(sources_block)
