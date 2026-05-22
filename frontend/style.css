@@ -502,6 +502,23 @@ footer {
     border-color: var(--accent);
 }
 
+/* ── Notes flash animation ─────────────────────────── */
+.flash {
+    animation: note-flash 0.3s ease;
+    color: #7ec87b !important;
+}
+@keyframes note-flash {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.15);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
 /* ── Sidebar (chat history) ────────────────────────── */
 #sidebar {
     position: fixed;

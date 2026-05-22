@@ -504,3 +504,38 @@ Release: bump `VERSION` in `backend/version.py` → `./build_deb.sh` → commit 
 - `tests/regression/README.md` — test suite documentation
 - `tests/regression/test_cases.json` — test cases
 - `tools/replay.py` — chat replay & comparison tool
+
+### v1.4.0 — Notes feature + window management
+
+**Phase A — Storage foundation:**
+- A1: SQLite notes store with FTS5 full-text search (diacritic-insensitive for Greek)
+- A2: REST API endpoints (`GET/POST/DELETE /api/notes`, `GET /api/notes/<id>`, `GET /api/notes/<id>/export`)
+
+**Phase B — Take-Note UX:**
+- B1: "📝 Note" button on every assistant message bubble (saves question + answer + sources + metadata)
+
+**Phase C — Notes panel + viewer:**
+- C1: Left drawer (`#notes-sidebar`) with slide animation, toggle via 🗒 header button
+- C2: Notes list with snippets, timestamps, model info, auto-refresh
+- C3: Detail modal with full Q+A+sources, markdown rendering, ESC/overlay close
+- C4: Delete with confirmation dialog
+
+**Phase E — Export:**
+- E1: TXT export (UTF-8 with BOM, structured headers)
+- E2: PDF export via fpdf2 (DejaVu Sans for Greek, clickable source URLs)
+
+**Phase F — Window management:**
+- F1: Single-instance via abstract UNIX socket (second launch surfaces existing window)
+- F2: System tray icon with Show/Quit menu (pystray + Pillow)
+- F3: Close (X) → minimize to tray instead of quit
+
+**New dependencies:**
+- `fpdf2` — PDF export
+- `pystray` + `Pillow` — System tray icon
+
+**New files:**
+- `backend/notes.py` — SQLite notes store with FTS5
+- `tests/regression/run.py` — Regression test runner (v1.3.0)
+- `tests/regression/test_cases.json` — Test cases (v1.3.0)
+- `tools/replay.py` — Chat replay tool (v1.3.0)
+- `icons/logos-32.png` — Tray icon

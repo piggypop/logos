@@ -9,3 +9,6 @@ ddgs
 pypdf
 python-docx
 websocket-client
+fpdf2>=2.7,<3
+pystray
+Pillow

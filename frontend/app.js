@@ -822,7 +822,8 @@ function renderNoteEntry(note) {
 
   const title = document.createElement("div");
   title.className = "note-entry-title";
-  title.textContent = note.snippet || note.question?.slice(0, 140) || "(empty)";
+  title.textContent =
+    note.snippet || note.user_message?.slice(0, 140) || "(empty)";
 
   const meta = document.createElement("div");
   meta.className = "note-entry-meta";
@@ -852,19 +853,19 @@ function renderNoteDetail(note) {
   const d = new Date(note.created_at);
   const dateStr = d.toLocaleString();
   const modelStr = note.model || "unknown";
-  const chatStr = note.chat_id?.slice(0, 8) || "—";
+  const chatStr = note.chat_title || note.chat_id?.slice(0, 8) || "—";
 
   let html = "";
   html += `\u003cdiv class="note-meta-line"\u003e${dateStr} · ${modelStr} · Chat: ${escapeHtml(chatStr)}\u003c/div\u003e`;
 
   html += '\u003cdiv class="note-section"\u003e';
   html += '\u003cdiv class="note-section-label"\u003eQuestion\u003c/div\u003e';
-  html += `\u003cdiv class="note-section-content"\u003e${marked.parse(escapeHtml(note.question || ""))}\u003c/div\u003e`;
+  html += `\u003cdiv class="note-section-content"\u003e${marked.parse(escapeHtml(note.user_message || ""))}\u003c/div\u003e`;
   html += "\u003c/div\u003e";
 
   html += '\u003cdiv class="note-section"\u003e';
   html += '\u003cdiv class="note-section-label"\u003eAnswer\u003c/div\u003e';
-  html += `\u003cdiv class="note-section-content"\u003e${marked.parse(note.answer || "")}\u003c/div\u003e`;
+  html += `\u003cdiv class="note-section-content"\u003e${marked.parse(note.assistant_message || "")}\u003c/div\u003e`;
   html += "\u003c/div\u003e";
 
   const sources = note.sources || [];
@@ -879,11 +880,21 @@ function renderNoteDetail(note) {
   }
 
   notesDetailBody.innerHTML = html;
+
+  // Enable export button
+  const exportBtn = document.getElementById("notes-detail-export");
+  exportBtn.disabled = false;
+  exportBtn.title = "";
+  exportBtn.textContent = "⬇ Export ▾";
+  exportBtn.onclick = (e) => toggleExportMenu(e);
 }
 
 function closeNoteDetail() {
   notesDetailOverlay.classList.add("hidden");
   currentNoteId = null;
+  // Also close export dropdown
+  const exportMenu = document.getElementById("export-dropdown");
+  if (exportMenu) exportMenu.remove();
 }
 
 async function deleteCurrentNote() {
@@ -1722,6 +1733,76 @@ document.addEventListener("keydown", (e) => {
     closeNoteDetail();
   }
 });
+
+// Export dropdown and download functions
+function toggleExportMenu(e) {
+  e.stopPropagation();
+  // Remove existing menu if any
+  const existing = document.getElementById("export-dropdown");
+  if (existing) {
+    existing.remove();
+    return;
+  }
+
+  const menu = document.createElement("div");
+  menu.id = "export-dropdown";
+  menu.style.cssText =
+    "position:absolute; background:var(--bg2); border:1px solid var(--border); border-radius:6px; padding:4px 0; z-index:400; min-width:120px; box-shadow:0 4px 12px rgba(0,0,0,0.3);";
+
+  const txtItem = document.createElement("div");
+  txtItem.textContent = "Text (.txt)";
+  txtItem.style.cssText = "padding:6px 14px; cursor:pointer; font-size:13px;";
+  txtItem.onmouseenter = () => (txtItem.style.background = "var(--bg3)");
+  txtItem.onmouseleave = () => (txtItem.style.background = "");
+  txtItem.onclick = () => {
+    menu.remove();
+    downloadNote("txt");
+  };
+
+  const pdfItem = document.createElement("div");
+  pdfItem.textContent = "PDF (.pdf)";
+  pdfItem.style.cssText = "padding:6px 14px; cursor:pointer; font-size:13px;";
+  pdfItem.onmouseenter = () => (pdfItem.style.background = "var(--bg3)");
+  pdfItem.onmouseleave = () => (pdfItem.style.background = "");
+  pdfItem.onclick = () => {
+    menu.remove();
+    downloadNote("pdf");
+  };
+
+  menu.append(txtItem, pdfItem);
+
+  // Position near the button
+  const btn = document.getElementById("notes-detail-export");
+  const rect = btn.getBoundingClientRect();
+  menu.style.top = rect.bottom + 4 + "px";
+  menu.style.left = rect.left + "px";
+
+  document.body.appendChild(menu);
+
+  // Close on outside click
+  setTimeout(() => {
+    document.addEventListener(
+      "click",
+      function closeMenu() {
+        menu.remove();
+        document.removeEventListener("click", closeMenu);
+      },
+      { once: true },
+    );
+  }, 0);
+}
+
+function downloadNote(fmt) {
+  if (!currentNoteId) return;
+  const url = `${API}/api/notes/${encodeURIComponent(currentNoteId)}/export?fmt=${fmt}`;
+  // Use a hidden anchor for reliable download in pywebview
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
 
 // Search input debounce (200ms)
 let notesSearchTimer = null;

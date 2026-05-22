@@ -497,6 +497,46 @@ def api_notes_delete(note_id):
     return jsonify({"deleted": note_id})
 
 
+@app.get("/api/notes/<note_id>/export")
+def api_notes_export(note_id):
+    """GET /api/notes/<id>/export?fmt=txt|pdf → download note as file."""
+    if not notes_store._is_valid_id(note_id):
+        return jsonify({"error": "invalid note id"}), 400
+
+    note = notes_store.get(note_id)
+    if note is None:
+        return jsonify({"error": "note not found"}), 404
+
+    fmt = request.args.get("fmt", "txt").lower()
+    if fmt not in ("txt", "pdf"):
+        return jsonify({"error": "fmt must be txt or pdf"}), 400
+
+    if fmt == "txt":
+        content = notes_store.render_txt(note)
+        filename = notes_store._fmt_export_filename(note, "txt")
+        return Response(
+            content,
+            mimetype="text/plain; charset=utf-8",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+            },
+        )
+
+    if fmt == "pdf":
+        try:
+            pdf_bytes = notes_store.render_pdf(note)
+        except Exception as e:
+            return jsonify({"error": f"PDF generation failed: {e}"}), 500
+        filename = notes_store._fmt_export_filename(note, "pdf")
+        return Response(
+            pdf_bytes,
+            mimetype="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+            },
+        )
+
+
 # ── Chat (SSE streaming) ─────────────────────────────────
 
 
