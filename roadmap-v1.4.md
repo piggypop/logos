@@ -1,8 +1,8 @@
-# Logos v1.4.0 — Notes Feature [COMPLETED]
+# Logos v1.4.1 — Notes Feature [COMPLETED]
 
 > **Status:** COMPLETED — All phases (A-F) implemented and reviewed.
 **Authored:** 2026-05-22, after v1.3.0 shipped.
-**Target version:** v1.4.0
+**Target version:** v1.4.1
 **Owner:** Architect (you, returning for review). Implementer: any LLM coder following this doc.
 **Note on file naming:** This is a separate file from `roadmap.md` (which now archives the v1.3.0 cycle). When v1.4 ships, the architect can decide on a long-term convention (e.g. move both to `docs/roadmaps/`).
 
