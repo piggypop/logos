@@ -1,0 +1,98 @@
+{
+  "version": "1.0",
+  "description": "Regression test cases for Logos",
+  "cases": [
+    {
+      "name": "greeting · simple",
+      "prompt": "Γεια σου!",
+      "min_tokens": 5
+    },
+    {
+      "name": "system · tokens",
+      "prompt": "Πόσα tokens έχεις επεξεργαστεί σε αυτό το conversation;",
+      "min_tokens": 10,
+      "expect_honest_uncertainty": true
+    },
+    {
+      "name": "date · current",
+      "prompt": "Τι ημερομηνία είναι σήμερα;",
+      "min_tokens": 10,
+      "expect_script_consistency": true
+    },
+    {
+      "name": "tool · ComfyUI",
+      "prompt": "https://example.com/art.png",
+      "min_tokens": 10,
+      "skip": true
+    },
+    {
+      "name": "tool · ComfyUI",
+      "prompt": "https://example.com/art2.png",
+      "min_tokens": 10,
+      "skip": true
+    },
+    {
+      "name": "tool · ComfyUI",
+      "prompt": "https://example.com/art3.png",
+      "min_tokens": 10,
+      "skip": true
+    },
+    {
+      "name": "tool · ComfyUI",
+      "prompt": "https://example.com/art4.png",
+      "min_tokens": 10,
+      "skip": true
+    },
+    {
+      "name": "tools · awk CSV",
+      "prompt": "Μετατρέπεις αυτό το CSV σε JSON; «a,b,c\\n1,2,3\\n4,5,6»",
+      "min_tokens": 20
+    },
+    {
+      "name": "script · technical explanation",
+      "prompt": "Εξήγησε σε μία παράγραφο πώς λειτουργεί το HTTPS handshake στα ελληνικά.",
+      "min_tokens": 40,
+      "expect_script_consistency": true
+    },
+    {
+      "name": "script · creative",
+      "prompt": "Γράψε ένα διήγημα 200 λέξεων για έναν αστρονόμο που χάνει την όρασή του.",
+      "min_tokens": 50,
+      "expect_script_consistency": true
+    },
+    {
+      "name": "script · long context",
+      "prompt": "Συνέχισε αυτή την ιστορία στα ελληνικά: Ο Γιάννης ξύπνησε ένα πρωί και ανακάλυψε ότι ο υπολογιστής του είχε εξαφανιστεί. Αντί για αυτόν, στο γραφείο του βρισκόταν ένα παλιό ξύλινο κουτί με μια χειρόγραφη σημείωση: «Μην το ανοίξεις πριν το ηλιοβασίλεμα.» Ο Γιάννης...",
+      "min_tokens": 60,
+      "expect_script_consistency": true
+    },
+    {
+      "name": "αναζήτηση · ειδήσεις Ελλάδας σήμερα",
+      "prompt": "Τι έγινε στις ειδήσεις στην Ελλάδα σήμερα;",
+      "expect_search": true,
+      "expect_sources": true,
+      "min_sources": 1,
+      "min_tokens": 20,
+      "force_search": true,
+      "expect_honest_uncertainty": true
+    },
+    {
+      "name": "αναζήτηση · cybersecurity incidents σήμερα",
+      "prompt": "Ποιες είναι οι τελευταίες κυβερνοεπιθέσεις που αναφέρθηκαν σήμερα;",
+      "expect_search": true,
+      "expect_sources": true,
+      "min_sources": 1,
+      "min_tokens": 20,
+      "force_search": true,
+      "expect_honest_uncertainty": true
+    },
+    {
+      "name": "URL · Hollow Knight",
+      "prompt": "https://www.youtube.com/watch?v=GnFQmujpdVE",
+      "expect_url_fetch": true,
+      "expect_sources": true,
+      "min_sources": 1,
+      "min_tokens": 50
+    }
+  ]
+}
