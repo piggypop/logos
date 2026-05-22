@@ -467,3 +467,40 @@ Release: bump `VERSION` in `backend/version.py` → `./build_deb.sh` → commit 
 - **ComfyUI custom workflows**: the placeholder mechanism only substitutes exact string matches like `"{{PROMPT}}"`. If your workflow node expects a number where you wrote a string placeholder, ComfyUI may reject it — use the right placeholder type or edit the workflow JSON.
 - **Vision-model attachment routing**: image attachments are only sent via Ollama's `images` field when the model has `vision` capability. The auto-discovery relies on `ollama.show(model).capabilities`; if a model misreports, attach gating may be wrong.
 - **Memory + notebook in same prompt**: when both are active, the system prompt can grow large fast. Keep an eye on your model's context window.
+
+---
+
+## Changelog
+
+### v1.3.0 — Small-model robustness
+
+**Phase B — Prompt hardening:**
+- B1: Date/time injection with authoritative block (appears 2× in assembled prompt)
+- B2: Anti-fabrication rules in `SEARCH_MODE_PROMPT` (5 rules: source-only facts, citation verification, thin-source honesty, "not covered" handling, no fake "I cannot access internet")
+- B3: Language-consistency rule (Greek/English detection, no multilingual token leakage)
+- B4: Summary framing rule (honest assessment of source completeness)
+
+**Phase C — Source-quality signals:**
+- C1: Thin-source tagging inline in `format_as_context()` (< 300 chars = `[THIN]`)
+- C2: `## SOURCE QUALITY` summary block before sources (counts thin vs substantial)
+
+**Phase D — Per-model tuning:**
+- D1: `model_overrides` in config + `effective()` lookup (per-model temperature)
+- D2: Conservative mode checkbox (temperature 0.4 preset for small models)
+
+**Phase E — Test harness:**
+- E1: Regression test runner (`tests/regression/run.py`) with snapshot + assertion suite
+- E2: Replay tool (`tools/replay.py`) for side-by-side prompt comparison
+
+**API changes (backwards compatible):**
+- `compose_system_prompt()`: new params `date_info`, `detected_language`, `source_quality_block`
+- `_build_system_prompt()`: new param `user_message`, `source_quality_block`
+- `format_as_context()`: thin tag appended to titles (same signature)
+- New: `date_block()`, `language_rule()`, `summary_framing_rule()`, `source_quality_summary()`
+- New config key: `model_overrides: {}`
+
+**New files:**
+- `tests/regression/run.py` — regression test runner
+- `tests/regression/README.md` — test suite documentation
+- `tests/regression/test_cases.json` — test cases
+- `tools/replay.py` — chat replay & comparison tool
