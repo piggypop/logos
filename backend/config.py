@@ -1,6 +1,7 @@
 import json
 import shutil
 from pathlib import Path
+from typing import Any
 
 import prompts as _prompts
 
@@ -93,8 +94,6 @@ def save(data: dict):
 
 def effective(c: dict, key: str, model: str) -> Any:
     """Return the per-model override for *key* if present, else the global value."""
-    from typing import Any
-
     overrides = c.get("model_overrides", {})
     model_cfg = overrides.get(model, {})
     if key in model_cfg:
