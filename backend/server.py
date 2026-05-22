@@ -13,6 +13,7 @@ import file_extractor
 import image_storage
 import image_workflows
 import memory as mem
+import notes as notes_store
 import ollama_client
 import open_notebook_client
 import prompts
@@ -434,6 +435,55 @@ def add_memory():
         return jsonify({"error": "text required"}), 400
     added = mem.add(text, source="manual")
     return jsonify({"ok": True, "added": added})
+
+
+# ── Notes ──────────────────────────────────────────────────
+
+
+@app.get("/api/notes")
+def api_notes_list():
+    """GET /api/notes?q=search_term → list all notes, optionally search."""
+    q = request.args.get("q", "").strip()
+    if q:
+        results = notes_store.search(q)
+    else:
+        results = notes_store.list_all()
+    return jsonify(results)
+
+
+@app.post("/api/notes")
+def api_notes_create():
+    """POST /api/notes → create a new note.
+
+    Body: {question, answer, sources?, chat_id?, model?}
+    Returns: the created note dict with 201 status.
+    """
+    data = request.get_json(silent=True) or {}
+    question = data.get("question", "").strip()
+    answer = data.get("answer", "").strip()
+    if not question or not answer:
+        return jsonify({"error": "question and answer are required"}), 400
+
+    note = notes_store.create(
+        user_message=question,
+        assistant_message=answer,
+        sources=data.get("sources") or [],
+        chat_id=data.get("chat_id", ""),
+        chat_title=None,
+        model=data.get("model", ""),
+    )
+    return jsonify(note), 201
+
+
+@app.delete("/api/notes/\u003cnote_id\u003e")
+def api_notes_delete(note_id):
+    """DELETE /api/notes/\u003cid\u003e → delete a note."""
+    if not notes_store._is_valid_id(note_id):
+        return jsonify({"error": "invalid note id"}), 400
+    ok = notes_store.delete(note_id)
+    if not ok:
+        return jsonify({"error": "note not found"}), 404
+    return jsonify({"deleted": note_id})
 
 
 # ── Chat (SSE streaming) ─────────────────────────────────

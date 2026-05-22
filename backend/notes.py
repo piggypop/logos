@@ -9,12 +9,11 @@ Schema: notes table + notes_fts virtual table with unicode61+remove_diacritics 2
 import json
 import re
 import sqlite3
+import textwrap
 import threading
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-
-import chats
 
 NOTES_DB = Path.home() / ".local" / "share" / "logos" / "notes.db"
 _lock = threading.Lock()
@@ -120,8 +119,6 @@ def _row_to_dict(row: sqlite3.Row, add_snippet: bool = False) -> dict:
 
     if add_snippet:
         # textwrap.shorten respects word boundaries and Unicode characters
-        import textwrap
-
         body = d.get("assistant_message", "")
         if len(body) <= 200:
             d["snippet"] = body
@@ -245,46 +242,16 @@ def delete(note_id: str) -> bool:
 
 
 def _sanitize_fts_query(query: str) -> str:
-    """Sanitize a query for FTS5 MATCH: wrap words in quotes, join with AND.
+    """Sanitize a query for FTS5 MATCH: wrap each word in double quotes.
 
-    FTS5 is picky: special characters, unbalanced quotes, etc. will error.
-    The safest approach: treat the query as space-separated tokens,
-    escape any quotes, wrap each in double quotes, join with space (AND).
+    Double-quoted terms are treated as literals by FTS5, so operators
+    like AND/OR/NOT/NEAR inside quotes are safe.
     """
-    # Remove FTS5 special operators that could cause syntax errors
-    for op in ("AND", "OR", "NOT", "NEAR"):
-        query = query.replace(op, " " + op + " ")
-
-    # Split into tokens, keeping quoted phrases
-    tokens = []
-    in_quote = False
-    current = ""
-    for char in query:
-        if char == '"':
-            in_quote = not in_quote
-            current += char
-        elif char.isspace():
-            if current:
-                tokens.append(current)
-                current = ""
-            in_quote = False
-        else:
-            current += char
-    if current:
-        tokens.append(current)
-
-    # Wrap each token in double quotes, escaping embedded quotes
-    safe_tokens = []
-    for t in tokens:
-        t = t.strip()
-        if not t:
-            continue
-        # Escape any double quotes
-        t = t.replace('"', '""')
-        safe_tokens.append(f'"{t}"')
-
-    if not safe_tokens:
+    tokens = query.split()
+    if not tokens:
         return ""
+    # Escape embedded double quotes and wrap each token
+    safe_tokens = [f'"{t.replace(chr(34), chr(34) + chr(34))}"' for t in tokens]
     return " ".join(safe_tokens)
 
 
