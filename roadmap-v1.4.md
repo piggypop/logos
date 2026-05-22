@@ -1,6 +1,6 @@
 # Logos — Notes Feature Roadmap (v1.3 → v1.4)
 
-> **Status:** Draft. Not yet implemented.
+> **Status:** In progress — currently on A1. Phase A approved, moving to A2.
 > **Authored:** 2026-05-22, after v1.3.0 shipped.
 > **Target version:** v1.4.0
 > **Owner:** Architect (you, returning for review). Implementer: any LLM coder following this doc.
