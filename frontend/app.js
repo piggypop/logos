@@ -822,8 +822,7 @@ function renderNoteEntry(note) {
 
   const title = document.createElement("div");
   title.className = "note-entry-title";
-  title.textContent =
-    note.snippet || note.assistant_message?.slice(0, 140) || "(empty)";
+  title.textContent = note.snippet || note.question?.slice(0, 140) || "(empty)";
 
   const meta = document.createElement("div");
   meta.className = "note-entry-meta";
@@ -853,19 +852,19 @@ function renderNoteDetail(note) {
   const d = new Date(note.created_at);
   const dateStr = d.toLocaleString();
   const modelStr = note.model || "unknown";
-  const chatStr = note.chat_title || note.chat_id?.slice(0, 8) || "—";
+  const chatStr = note.chat_id?.slice(0, 8) || "—";
 
   let html = "";
   html += `\u003cdiv class="note-meta-line"\u003e${dateStr} · ${modelStr} · Chat: ${escapeHtml(chatStr)}\u003c/div\u003e`;
 
   html += '\u003cdiv class="note-section"\u003e';
   html += '\u003cdiv class="note-section-label"\u003eQuestion\u003c/div\u003e';
-  html += `\u003cdiv class="note-section-content"\u003e${marked.parse(escapeHtml(note.user_message || ""))}\u003c/div\u003e`;
+  html += `\u003cdiv class="note-section-content"\u003e${marked.parse(escapeHtml(note.question || ""))}\u003c/div\u003e`;
   html += "\u003c/div\u003e";
 
   html += '\u003cdiv class="note-section"\u003e';
   html += '\u003cdiv class="note-section-label"\u003eAnswer\u003c/div\u003e';
-  html += `\u003cdiv class="note-section-content"\u003e${marked.parse(note.assistant_message || "")}\u003c/div\u003e`;
+  html += `\u003cdiv class="note-section-content"\u003e${marked.parse(note.answer || "")}\u003c/div\u003e`;
   html += "\u003c/div\u003e";
 
   const sources = note.sources || [];
