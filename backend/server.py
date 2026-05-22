@@ -46,10 +46,19 @@ def _extract_facts_bg(messages: list[dict], c: dict):
         sys.stderr.flush()
 
 
+def _detect_language(text: str) -> str:
+    """Simple heuristic: if Greek characters present, return 'Greek', else 'English'."""
+    greek_chars = set("αβγδεζηθικλμνξοπρστυφχψωάέήίόύώΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩΆΈΉΊΌΎΏ")
+    if any(c in greek_chars for c in text):
+        return "Greek"
+    return "English"
+
+
 def _build_system_prompt(
     c: dict,
     sources_block: str = "",
     has_notebook: bool = False,
+    user_message: str = "",
 ) -> str:
     """Compose the final system message via the central prompt module."""
     now = datetime.now().astimezone()
@@ -58,6 +67,7 @@ def _build_system_prompt(
         "human": now.strftime("%A, %d %B %Y, %H:%M"),
         "tz": now.strftime("%Z"),
     }
+    detected_language = _detect_language(user_message)
     return prompts.compose_system_prompt(
         user_system_prompt=c.get("system_prompt") or "",
         date_info=date_info,
@@ -66,6 +76,7 @@ def _build_system_prompt(
         has_sources=bool(sources_block),
         has_notebook=has_notebook,
         sources_block=sources_block,
+        detected_language=detected_language,
     )
 
 
@@ -522,6 +533,7 @@ def chat():
                 c,
                 sources_block=sources_block,
                 has_notebook=bool(notebook_sources),
+                user_message=last_user_message,
             )
 
             # ── Debug: log assembled system prompt (Phase A1) ──

@@ -200,6 +200,17 @@ _DATE_BLOCK_HEADER = (
     "## CURRENT DATE AND TIME (authoritative — overrides training data)"
 )
 
+_LANGUAGE_RULE_TEMPLATE = """## LANGUAGE RULE
+
+The user is writing in {detected_language}. You MUST reply in the same
+language. Do NOT mix languages in your response. Do NOT output words,
+phrases, or characters from other languages (e.g. Vietnamese, Chinese,
+Arabic) unless the user explicitly asks for translation or the source
+material is in that language and you are quoting it.
+
+If you accidentally start in the wrong language, restart your response
+in {detected_language}."""
+
 
 def date_block(date_info: dict) -> str:
     """Format the date block that appears in the system prompt.
@@ -224,6 +235,11 @@ def date_block(date_info: dict) -> str:
     )
 
 
+def language_rule(detected_language: str) -> str:
+    """Return the language-consistency rule block."""
+    return _LANGUAGE_RULE_TEMPLATE.format(detected_language=detected_language)
+
+
 def compose_system_prompt(
     *,
     user_system_prompt: str,
@@ -233,6 +249,7 @@ def compose_system_prompt(
     has_sources: bool,
     has_notebook: bool,
     sources_block: str,
+    detected_language: str,
 ) -> str:
     """Assemble the final system message Logos sends to Ollama.
 
@@ -243,7 +260,8 @@ def compose_system_prompt(
       4. background facts about the user
       5. mode-specific addenda (search, notebook)
       6. date/time block repeated (near end, for small-model attention)
-      7. sources content
+      7. language consistency rule
+      8. sources content
     """
     dt_block = date_block(date_info)
     parts: list[str] = [
@@ -265,6 +283,9 @@ def compose_system_prompt(
 
     # Repeat date block near the end so small models see it close to the user turn.
     parts.append(dt_block)
+
+    # Language consistency rule (after 2nd date block, before sources)
+    parts.append(language_rule(detected_language))
 
     if sources_block:
         parts.append(sources_block)
