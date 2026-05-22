@@ -25,6 +25,17 @@ const modelBadge = document.getElementById("model-badge");
 const searchIndicator = document.getElementById("search-indicator");
 const searchLabel = document.getElementById("search-label");
 
+const btnNotesToggle = document.getElementById("btn-notes-toggle");
+const btnNotesClose = document.getElementById("btn-notes-close");
+const notesSidebar = document.getElementById("notes-sidebar");
+const notesSearch = document.getElementById("notes-search");
+const notesListEl = document.getElementById("notes-list");
+const notesDetailOverlay = document.getElementById("notes-detail-overlay");
+const notesDetailBody = document.getElementById("notes-detail-body");
+const notesDetailClose = document.getElementById("notes-detail-close");
+const notesDetailDelete = document.getElementById("notes-detail-delete");
+let currentNoteId = null;
+
 // ── Init ─────────────────────────────────────────────────────────────────────
 async function init() {
   await loadConfig();
@@ -314,6 +325,10 @@ async function takeNote(question, answer, sources, btnEl) {
         btnEl.textContent = "📝 Note";
         btnEl.classList.remove("flash");
       }, 1200);
+      // Refresh notes sidebar if open
+      if (notesSidebar.classList.contains("open")) {
+        loadNotes(notesSearch.value.trim() || null);
+      }
     } else {
       btnEl.textContent = "✗ Failed";
       setTimeout(() => {
@@ -753,6 +768,142 @@ async function deleteChat(chatId, title) {
 function toggleSidebar() {
   sidebar.classList.toggle("open");
   if (sidebar.classList.contains("open")) loadChatList();
+}
+
+// ── Notes Sidebar (Phase C1-C4) ────────────────────────────────────────────
+function toggleNotesSidebar() {
+  notesSidebar.classList.toggle("open");
+  if (notesSidebar.classList.contains("open")) {
+    loadNotes();
+    notesSearch.value = "";
+    notesSearch.focus();
+  }
+}
+
+function closeNotesSidebar() {
+  notesSidebar.classList.remove("open");
+}
+
+async function loadNotes(query) {
+  try {
+    const url = query
+      ? `${API}/api/notes?q=${encodeURIComponent(query)}`
+      : `${API}/api/notes`;
+    const r = await fetch(url);
+    const notes = await r.json();
+    renderNotesList(notes, query);
+  } catch (e) {
+    console.error("Load notes failed:", e);
+    notesListEl.innerHTML =
+      '\u003cdiv class="chat-list-empty"\u003eFailed to load notes\u003c/div\u003e';
+  }
+}
+
+function renderNotesList(notes, query) {
+  notesListEl.innerHTML = "";
+  if (!notes || !notes.length) {
+    const empty = document.createElement("div");
+    empty.className = "chat-list-empty";
+    empty.textContent = query
+      ? `No notes match "${query}"`
+      : "No notes yet. Click 📝 Note under any answer to save it.";
+    notesListEl.appendChild(empty);
+    return;
+  }
+  for (const n of notes) {
+    notesListEl.appendChild(renderNoteEntry(n));
+  }
+}
+
+function renderNoteEntry(note) {
+  const entry = document.createElement("div");
+  entry.className = "note-entry";
+  entry.onclick = () => openNoteDetail(note.id);
+
+  const title = document.createElement("div");
+  title.className = "note-entry-title";
+  title.textContent =
+    note.snippet || note.assistant_message?.slice(0, 140) || "(empty)";
+
+  const meta = document.createElement("div");
+  meta.className = "note-entry-meta";
+  const d = new Date(note.created_at);
+  const dateStr = d.toLocaleString();
+  const modelStr = note.model ? ` · ${note.model}` : "";
+  meta.textContent = `${dateStr}${modelStr}`;
+
+  entry.append(title, meta);
+  return entry;
+}
+
+async function openNoteDetail(noteId) {
+  try {
+    const r = await fetch(`${API}/api/notes/${encodeURIComponent(noteId)}`);
+    if (!r.ok) return;
+    const note = await r.json();
+    renderNoteDetail(note);
+    currentNoteId = note.id;
+    notesDetailOverlay.classList.remove("hidden");
+  } catch (e) {
+    console.error("Open note detail failed:", e);
+  }
+}
+
+function renderNoteDetail(note) {
+  const d = new Date(note.created_at);
+  const dateStr = d.toLocaleString();
+  const modelStr = note.model || "unknown";
+  const chatStr = note.chat_title || note.chat_id?.slice(0, 8) || "—";
+
+  let html = "";
+  html += `\u003cdiv class="note-meta-line"\u003e${dateStr} · ${modelStr} · Chat: ${escapeHtml(chatStr)}\u003c/div\u003e`;
+
+  html += '\u003cdiv class="note-section"\u003e';
+  html += '\u003cdiv class="note-section-label"\u003eQuestion\u003c/div\u003e';
+  html += `\u003cdiv class="note-section-content"\u003e${marked.parse(escapeHtml(note.user_message || ""))}\u003c/div\u003e`;
+  html += "\u003c/div\u003e";
+
+  html += '\u003cdiv class="note-section"\u003e';
+  html += '\u003cdiv class="note-section-label"\u003eAnswer\u003c/div\u003e';
+  html += `\u003cdiv class="note-section-content"\u003e${marked.parse(note.assistant_message || "")}\u003c/div\u003e`;
+  html += "\u003c/div\u003e";
+
+  const sources = note.sources || [];
+  if (sources.length) {
+    html += '\u003cdiv class="note-section"\u003e';
+    html += '\u003cdiv class="note-section-label"\u003eSources\u003c/div\u003e';
+    html += '\u003cdiv class="note-sources"\u003e';
+    sources.forEach((s, i) => {
+      html += `\u003ca href="${escapeHtml(s.url || "")}" target="_blank" rel="noopener noreferrer"\u003e[${i + 1}] ${escapeHtml(s.title || s.url || "")}\u003c/a\u003e`;
+    });
+    html += "\u003c/div\u003e\u003c/div\u003e";
+  }
+
+  notesDetailBody.innerHTML = html;
+}
+
+function closeNoteDetail() {
+  notesDetailOverlay.classList.add("hidden");
+  currentNoteId = null;
+}
+
+async function deleteCurrentNote() {
+  if (!currentNoteId) return;
+  if (!confirm("Delete this note? This cannot be undone.")) return;
+  try {
+    const r = await fetch(
+      `${API}/api/notes/${encodeURIComponent(currentNoteId)}`,
+      {
+        method: "DELETE",
+      },
+    );
+    if (r.ok) {
+      closeNoteDetail();
+      loadNotes(notesSearch.value.trim() || null);
+    }
+  } catch (e) {
+    console.error("Delete note failed:", e);
+  }
 }
 
 // ── Settings ─────────────────────────────────────────────────────────────────
@@ -1553,6 +1704,34 @@ userInput.addEventListener("input", autoResizeTextarea);
 // Close settings on overlay click
 document.getElementById("settings-overlay").addEventListener("click", (e) => {
   if (e.target.id === "settings-overlay") closeSettings();
+});
+
+// ── Notes Sidebar Event Listeners ────────────────────────────────────────────
+btnNotesToggle.addEventListener("click", toggleNotesSidebar);
+btnNotesClose.addEventListener("click", closeNotesSidebar);
+notesDetailClose.addEventListener("click", closeNoteDetail);
+notesDetailDelete.addEventListener("click", deleteCurrentNote);
+
+// Close detail modal on overlay click
+notesDetailOverlay.addEventListener("click", (e) => {
+  if (e.target === notesDetailOverlay) closeNoteDetail();
+});
+
+// ESC to close detail modal
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !notesDetailOverlay.classList.contains("hidden")) {
+    closeNoteDetail();
+  }
+});
+
+// Search input debounce (200ms)
+let notesSearchTimer = null;
+notesSearch.addEventListener("input", () => {
+  clearTimeout(notesSearchTimer);
+  notesSearchTimer = setTimeout(() => {
+    const q = notesSearch.value.trim();
+    loadNotes(q || null);
+  }, 200);
 });
 
 // ── Start ─────────────────────────────────────────────────────────────────────

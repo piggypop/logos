@@ -397,6 +397,7 @@
                     <button id="btn-sidebar-toggle" title="Chat history">
                         ☰
                     </button>
+                    <button id="btn-notes-toggle" title="Notes">🗒</button>
                 </div>
             </header>
 
@@ -409,6 +410,21 @@
                 <div id="chat-list"></div>
             </aside>
 
+            <!-- Notes Sidebar (left) -->
+            <aside id="notes-sidebar" class="closed">
+                <div id="notes-sidebar-header">
+                    <span>Notes</span>
+                    <button id="btn-notes-close" title="Close">✕</button>
+                </div>
+                <input
+                    id="notes-search"
+                    type="search"
+                    placeholder="Search notes…"
+                    autocomplete="off"
+                />
+                <div id="notes-list"></div>
+            </aside>
+
             <main id="chat-area">
                 <div id="messages"></div>
                 <div id="search-indicator" class="hidden">
@@ -416,6 +432,29 @@
                     <span id="search-label">Searching…</span>
                 </div>
             </main>
+
+            <!-- Note Detail Overlay (modal) -->
+            <div id="notes-detail-overlay" class="hidden">
+                <div id="notes-detail-panel">
+                    <div class="settings-header">
+                        <span>Note details</span>
+                        <button id="notes-detail-close">✕</button>
+                    </div>
+                    <div id="notes-detail-body"></div>
+                    <div id="notes-detail-actions">
+                        <button id="notes-detail-delete" class="danger">
+                            🗑 Delete
+                        </button>
+                        <button
+                            id="notes-detail-export"
+                            disabled
+                            title="Coming in v1.4.0 Phase E"
+                        >
+                            ⬇ Export ▾
+                        </button>
+                    </div>
+                </div>
+            </div>
 
             <footer>
                 <div id="attachments-bar" class="hidden"></div>

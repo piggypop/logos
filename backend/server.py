@@ -475,6 +475,17 @@ def api_notes_create():
     return jsonify(note), 201
 
 
+@app.get("/api/notes/\u003cnote_id\u003e")
+def api_notes_get(note_id):
+    """GET /api/notes/\u003cid\u003e → full note dict or 404."""
+    if not notes_store._is_valid_id(note_id):
+        return jsonify({"error": "invalid note id"}), 400
+    note = notes_store.get(note_id)
+    if note is None:
+        return jsonify({"error": "note not found"}), 404
+    return jsonify(note)
+
+
 @app.delete("/api/notes/\u003cnote_id\u003e")
 def api_notes_delete(note_id):
     """DELETE /api/notes/\u003cid\u003e → delete a note."""
