@@ -53,10 +53,14 @@ def _build_system_prompt(
 ) -> str:
     """Compose the final system message via the central prompt module."""
     now = datetime.now().astimezone()
-    date_line = f"Current date and time: {now.strftime('%A, %d %B %Y, %H:%M %Z')}"
+    date_info = {
+        "iso": now.isoformat(),
+        "human": now.strftime("%A, %d %B %Y, %H:%M"),
+        "tz": now.strftime("%Z"),
+    }
     return prompts.compose_system_prompt(
         user_system_prompt=c.get("system_prompt") or "",
-        date_line=date_line,
+        date_info=date_info,
         location=(c.get("user_location") or "").strip(),
         memory_facts=mem.load(),
         has_sources=bool(sources_block),

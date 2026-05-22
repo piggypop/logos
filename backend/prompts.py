@@ -149,6 +149,7 @@ REFORMULATOR_USER_HINT = "Write the search query for my most recent message abov
 
 # ── Fact extractor (runs in background after every assistant reply) ────────
 
+
 def fact_extractor_system(existing_facts: list[str]) -> str:
     existing_block = (
         "\n".join(f"- {f}" for f in existing_facts) if existing_facts else "(none yet)"
@@ -177,10 +178,38 @@ FACT_EXTRACTOR_USER_HINT = (
 
 # ── Composition helper: build the full system prompt for /api/chat ─────────
 
+_DATE_BLOCK_HEADER = (
+    "## CURRENT DATE AND TIME (authoritative — overrides training data)"
+)
+
+
+def date_block(date_info: dict) -> str:
+    """Format the date block that appears in the system prompt.
+
+    Placed twice in the assembled prompt (top + near bottom) so small models
+    with weak long-range attention see it close to the user turn.
+    """
+    return "\n".join(
+        [
+            _DATE_BLOCK_HEADER,
+            "",
+            f"ISO: {date_info['iso']}",
+            f"Human: {date_info['human']}",
+            f"Timezone: {date_info['tz']}",
+            "",
+            (
+                "When the user asks about today's date, current time, or any"
+                ' "now"-relative question, use exactly this value. Do not'
+                " output a year or day from your training data."
+            ),
+        ]
+    )
+
+
 def compose_system_prompt(
     *,
     user_system_prompt: str,
-    date_line: str,
+    date_info: dict,
     location: str,
     memory_facts: list[dict],
     has_sources: bool,
@@ -191,12 +220,18 @@ def compose_system_prompt(
 
     Order is intentional:
       1. base behavior rules (user-configurable)
-      2. world state (date/time, location)
-      3. background facts about the user
-      4. mode-specific addenda (search, notebook)
-      5. sources content
+      2. date/time block (high-priority, overrides training data)
+      3. world state (location)
+      4. background facts about the user
+      5. mode-specific addenda (search, notebook)
+      6. date/time block repeated (near end, for small-model attention)
+      7. sources content
     """
-    parts: list[str] = [user_system_prompt or MAIN_SYSTEM_PROMPT, date_line]
+    dt_block = date_block(date_info)
+    parts: list[str] = [
+        user_system_prompt or MAIN_SYSTEM_PROMPT,
+        dt_block,
+    ]
 
     if location:
         parts.append(f"User location: {location}")
@@ -209,6 +244,10 @@ def compose_system_prompt(
         parts.append(SEARCH_MODE_PROMPT)
     if has_notebook:
         parts.append(NOTEBOOK_PROMPT)
+
+    # Repeat date block near the end so small models see it close to the user turn.
+    parts.append(dt_block)
+
     if sources_block:
         parts.append(sources_block)
 
