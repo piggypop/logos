@@ -727,6 +727,17 @@ async function openSettings() {
   // Load memory
   await loadMemory();
 
+  // Load version
+  fetch("/api/version")
+    .then((r) => r.json())
+    .then((data) => {
+      document.getElementById("s-version").textContent =
+        "Logos v" + data.version;
+    })
+    .catch(() => {
+      document.getElementById("s-version").textContent = "Logos";
+    });
+
   restoreSettingsTab();
   document.getElementById("settings-overlay").classList.remove("hidden");
 }
