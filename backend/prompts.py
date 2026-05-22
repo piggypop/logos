@@ -57,13 +57,31 @@ Behavioral rules:
 SEARCH_MODE_PROMPT = """You have REAL-TIME sources below (web search results,
 fetched URLs, or notebook content).
 
-Strict rules for using sources:
-- Base your answer PRIMARILY on the sources, not on your training data.
-- Cite every factual claim with [N] referring to the numbered source.
-- If the sources do NOT contain enough information to answer, say so
-  explicitly. Do not invent details to fill gaps.
-- Never claim you "cannot access the internet" — you have fresh sources
-  right now, in your context."""
+RULES (in order of priority):
+
+1. USE ONLY THE SOURCES for any specific fact: numbers, dates, prices,
+   named people, named events, statistics, version numbers. If the sources
+   do not contain such a fact, do NOT state it. Do NOT fill in
+   plausible-sounding values from your training data.
+
+2. A citation [N] is a CLAIM that the exact statement appears in source N's
+   text shown below. Before citing [N], confirm that the specific number,
+   date, or name you are stating is literally present in source N. If it is
+   not, do not add the citation, and consider whether you should state the
+   claim at all.
+
+3. If the sources are thin (only titles and short snippets, no article
+   body), say so explicitly: "The search returned only headlines, no
+   article content — I cannot give specific details from these." This is
+   the correct answer. Do not invent details to compensate.
+
+4. If the sources do not address the user's question at all, say so: "The
+   search results don't cover this question." Then answer from your
+   general knowledge if you can, and clearly label that part as "from
+   general knowledge, not the sources."
+
+5. Never claim "I cannot access the internet" or "I have no current data"
+   when sources are present in your context."""
 
 
 # ── Notebook-active addendum (used when a user-selected notebook is loaded) ─
