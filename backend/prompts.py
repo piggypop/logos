@@ -235,9 +235,30 @@ def date_block(date_info: dict) -> str:
     )
 
 
+_SUMMARY_FRAMING_RULE = """## SUMMARY FRAMING RULE
+
+Before writing your final answer, assess silently:
+
+- Are the sources comprehensive enough to fully answer the user's question?
+- If YES: answer normally.
+- If PARTIALLY: begin your response with a qualifier like:
+  "Based on the limited search results available..." or
+  "The sources I found cover only part of this — here's what they contain..."
+- If NO (sources are irrelevant or absent): say so clearly and do not
+  fabricate an answer from partial matches.
+
+Do NOT present a partial answer as if it is the complete picture. The user
+should know how much to trust the response based on what was actually found."""
+
+
 def language_rule(detected_language: str) -> str:
     """Return the language-consistency rule block."""
     return _LANGUAGE_RULE_TEMPLATE.format(detected_language=detected_language)
+
+
+def summary_framing_rule() -> str:
+    """Return the summary framing rule block."""
+    return _SUMMARY_FRAMING_RULE
 
 
 def compose_system_prompt(
@@ -262,6 +283,7 @@ def compose_system_prompt(
       6. date/time block repeated (near end, for small-model attention)
       7. language consistency rule
       8. sources content
+      9. summary framing rule (only when sources present)
     """
     dt_block = date_block(date_info)
     parts: list[str] = [
@@ -289,5 +311,9 @@ def compose_system_prompt(
 
     if sources_block:
         parts.append(sources_block)
+
+    # Summary framing rule (after sources, last thing before user message)
+    if has_sources:
+        parts.append(summary_framing_rule())
 
     return "\n\n".join(p for p in parts if p)
