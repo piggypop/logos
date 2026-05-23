@@ -67,6 +67,9 @@
                         Notebook
                     </button>
                     <button class="settings-tab" data-tab="image">Image</button>
+                    <button class="settings-tab" data-tab="obsidian">
+                        Obsidian
+                    </button>
                     <button class="settings-tab" data-tab="memory">
                         Memory
                     </button>
@@ -353,6 +356,67 @@
                         </label>
                     </div>
 
+                    <!-- Obsidian tab -->
+                    <div class="settings-tab-panel" data-panel="obsidian">
+                        <label
+                            >Vault path
+                            <button
+                                id="s-obsidian-browse"
+                                class="inline-btn"
+                                title="Browse for vault folder"
+                            >
+                                📁
+                            </button>
+                        </label>
+                        <input
+                            type="text"
+                            id="s-obsidian-vault-path"
+                            placeholder="/home/you/Documents/Obsidian Vault"
+                        />
+
+                        <label>Daily note path (relative to vault)</label>
+                        <input
+                            type="text"
+                            id="s-obsidian-daily-note-path"
+                            placeholder="Daily Notes/{date}.md"
+                        />
+                        <span class="muted-note"
+                            >Use <code>{date}</code> for YYYY-MM-DD.</span
+                        >
+
+                        <label>Section header</label>
+                        <input
+                            type="text"
+                            id="s-obsidian-section-header"
+                            placeholder="## About Logos"
+                        />
+
+                        <label>Digest format</label>
+                        <select id="s-obsidian-digest-format">
+                            <option value="titles">Titles only</option>
+                            <option value="excerpts">
+                                Titles + first message
+                            </option>
+                            <option value="summaries" disabled>
+                                LLM summary per chat (v1.5.1)
+                            </option>
+                        </select>
+
+                        <div class="obsidian-actions">
+                            <button id="s-obsidian-sync" class="inline-btn">
+                                Sync yesterday now
+                            </button>
+                            <button id="s-obsidian-preview" class="inline-btn">
+                                Preview…
+                            </button>
+                        </div>
+                        <div
+                            id="s-obsidian-status"
+                            class="muted-note"
+                            style="margin-top: 8px"
+                        ></div>
+                    </div>
+
                     <!-- Memory tab -->
                     <div class="settings-tab-panel" data-panel="memory">
                         <label
@@ -378,6 +442,12 @@
                         style="margin-right: auto"
                         >Logos v</span
                     >
+                    <button
+                        id="settings-quit"
+                        title="Fully exit Logos (close window only minimises)"
+                    >
+                        Quit Logos
+                    </button>
                     <button id="settings-save">Save</button>
                     <button id="settings-cancel">Cancel</button>
                 </div>
@@ -397,7 +467,7 @@
                     <button id="btn-sidebar-toggle" title="Chat history">
                         ☰
                     </button>
-                    <button id="btn-notes-toggle" title="Notes">🗎</button>
+                    <button id="btn-notes-toggle" title="Notes">▤</button>
                 </div>
             </header>
 

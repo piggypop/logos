@@ -1,0 +1,32 @@
+{
+  "name": "ambiguity · pronoun reference",
+  "passed": false,
+  "category": "ambiguity",
+  "assertions": {
+    "min_tokens": false,
+    "expect_honest_uncertainty": false,
+    "expect_script_consistency": {
+      "passed": true,
+      "offenders": []
+    }
+  },
+  "sources": [],
+  "elapsed": 0.0,
+  "sse_events": [
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "done"
+  ]
+}

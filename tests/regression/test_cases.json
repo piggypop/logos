@@ -16,7 +16,7 @@
     {
       "name": "date · current",
       "prompt": "Τι ημερομηνία είναι σήμερα;",
-      "min_tokens": 10,
+      "min_tokens": 5,
       "expect_script_consistency": true
     },
     {

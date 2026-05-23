@@ -28,6 +28,7 @@ Minimal desktop chat app for local LLMs via Ollama — with multi-provider web s
 - **Persistent cross-chat memory** — automatic background extraction of facts about you after each chat (name, preferences, work, hobbies, etc.), plus manual triggers (`/remember ...`, `remember: ...`, or Greek `να θυμάσαι ότι ...`). View & delete from Settings → Memory.
 - **Open Notebook integration** — connect to a [self-hosted Open Notebook](https://github.com/lfnovo/open-notebook) instance, pick an active notebook, and Logos grounds every chat in that notebook's sources (full-text injection with token estimation).
 - **ComfyUI image generation** — connect to any local or networked ComfyUI (`http://localhost:8188` or your home machine's IP). Built-in SDXL workflow + paste-your-own custom workflow with placeholder substitution. Auto-discovers checkpoints/samplers/schedulers. Optional LLM commentary after generation.
+- **Obsidian Daily-Note sync** — point Logos at your Obsidian vault and every morning the previous day's chats appear in today's daily note under `## About Logos`. Configurable digest format (titles only / titles + first message). Manual "Sync now" button in Settings + automatic once-per-day sync on launch. Stdlib only — no new dependencies.
 - **Chat history sidebar** — grouped by date (Today / Yesterday / Last 7 days / Older), rename, native-dialog export as JSON, delete.
 - **Per-message actions** — copy markdown, regenerate from any point in the history.
 - **Sources panel** — every reply that used web/URL/notebook context shows clickable numbered footnotes `[1]…[N]`.
@@ -122,7 +123,10 @@ That's it. Click ⊕ (top-right) for a new chat, type, hit Enter.
 | **System Prompt** | Editable system prompt (full-height textarea) |
 | **Notebook** | Open Notebook API + UI URLs, active notebook dropdown, token estimate, refresh button |
 | **Image** | ComfyUI URL, workflow (preset or custom JSON), checkpoint/sampler/scheduler dropdowns (auto-populated), dimensions, steps, CFG, negative prompt, post-gen commentary toggle |
+| **Obsidian** | Vault path (with 📁 native folder picker), daily-note path template (`{date}` placeholder), section header, digest format, **Sync yesterday now** + **Preview…** buttons |
 | **Memory** | List of saved facts with delete buttons |
+
+The settings footer also has a **Quit Logos** button — use this to fully exit. The window's X button only minimises (so the app stays in the tray / taskbar).
 
 ---
 
@@ -133,7 +137,9 @@ That's it. Click ⊕ (top-right) for a new chat, type, hit Enter.
 | Config | `~/.config/logos/config.json` |
 | Chats | `~/.local/share/logos/chats/<uuid>.json` |
 | Memory | `~/.local/share/logos/memory.json` |
+| Notes | `~/.local/share/logos/notes.db` |
 | Generated images | `~/.local/share/logos/images/<chat_id>/<timestamp>_<seed>.png` |
+| Obsidian last-sync marker | `~/.local/share/logos/obsidian_last_sync.txt` |
 
 When a chat is deleted from the sidebar, its associated images are also cleaned up.
 

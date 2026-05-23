@@ -1,0 +1,27 @@
+{
+  "name": "translation · el to en simple",
+  "passed": true,
+  "category": "translation",
+  "assertions": {
+    "min_tokens": true
+  },
+  "sources": [],
+  "elapsed": 0.0,
+  "sse_events": [
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "done"
+  ]
+}

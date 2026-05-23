@@ -1,0 +1,62 @@
+{
+  "name": "translation · idiom en to el",
+  "passed": false,
+  "category": "translation",
+  "assertions": {
+    "min_tokens": true,
+    "expect_script_consistency": {
+      "passed": true,
+      "offenders": []
+    },
+    "expected_keywords": {
+      "passed": false,
+      "found": [],
+      "missing": [
+        "καρέκλες",
+        "καρεκλοπόδαρα"
+      ]
+    }
+  },
+  "sources": [],
+  "elapsed": 0.0,
+  "sse_events": [
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "done"
+  ]
+}

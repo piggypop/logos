@@ -1,0 +1,36 @@
+{
+  "name": "reasoning · riddle",
+  "passed": false,
+  "category": "reasoning",
+  "assertions": {
+    "min_tokens": false,
+    "expect_script_consistency": {
+      "passed": true,
+      "offenders": []
+    },
+    "expected_keywords": {
+      "passed": false,
+      "found": [],
+      "missing": [
+        "ηχώ",
+        "ηχ"
+      ]
+    }
+  },
+  "sources": [],
+  "elapsed": 0.0,
+  "sse_events": [
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "done"
+  ]
+}

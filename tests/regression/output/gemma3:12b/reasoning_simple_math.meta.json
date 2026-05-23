@@ -1,0 +1,46 @@
+{
+  "name": "reasoning · simple math",
+  "passed": true,
+  "category": "reasoning",
+  "assertions": {
+    "min_tokens": true,
+    "expected_keywords": {
+      "passed": true,
+      "found": [
+        "597"
+      ],
+      "missing": []
+    }
+  },
+  "sources": [],
+  "elapsed": 0.0,
+  "sse_events": [
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "done"
+  ]
+}

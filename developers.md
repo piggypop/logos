@@ -1,6 +1,6 @@
 # Logos — Developer & LLM Reference
 
-> Complete architecture and API reference for anyone (human or LLM) modifying, fixing, or extending Logos. Version 1.2.
+> Complete architecture and API reference for anyone (human or LLM) modifying, fixing, or extending Logos. Version 1.5.
 
 This document is the **single source of truth**. If you change something material, update this file in the same commit.
 
@@ -72,6 +72,8 @@ logos/
 │   ├── comfyui_client.py   # ComfyUI REST + WebSocket client
 │   ├── image_workflows.py  # built-in templates + placeholder substitution
 │   ├── image_storage.py    # disk storage for generated images
+│   ├── notes.py            # SQLite + FTS5 store for "Take note" feature
+│   ├── obsidian_sync.py    # Obsidian Daily-Note digest writer (no new deps)
 │   └── requirements.txt
 └── frontend/
     ├── index.html          # static markup (header, chat area, sidebar, settings modal, image modal)
@@ -89,6 +91,9 @@ logos/
 | `~/.local/share/logos/chats/<uuid>.json` | `chats.py` | `{id, title, created_at, updated_at, messages[]}` |
 | `~/.local/share/logos/memory.json` | `memory.py` | `{facts: [{id, text, source, created_at}]}` |
 | `~/.local/share/logos/images/<chat_id>/<ts>_<seed>.<ext>` | `image_storage.py` | binary image files |
+| `~/.local/share/logos/notes.db` | `notes.py` | SQLite (notes table + notes_fts FTS5 virtual table) |
+| `~/.local/share/logos/obsidian_last_sync.txt` | `app.py` (auto-sync) | one line: ISO date of last successful auto-sync |
+| `<vault>/Daily Notes/YYYY-MM-DD.md` | `obsidian_sync.py` | user's Obsidian daily note; we only touch one `##` section |
 
 All four modules implement **one-time auto-migration** from the legacy `chat_app` paths where applicable.
 
@@ -180,6 +185,33 @@ All endpoints JSON in / JSON out unless noted. Base: `http://127.0.0.1:<port>`.
 | POST | `/api/memory` | `{text}` | `{ok, added: bool}` |
 | DELETE | `/api/memory/<id>` | — | `{ok: true}` |
 
+### Obsidian sync
+
+| Method | Path | Body | Response |
+|---|---|---|---|
+| POST | `/api/obsidian/sync` | `{date?: "YYYY-MM-DD", dry_run?: bool}` | Result dict (see below). Defaults to yesterday. |
+| GET | `/api/obsidian/preview?date=YYYY-MM-DD` | — | Same as POST with `dry_run=true`. |
+
+Result dict shape:
+
+```json
+{
+  "ok": true,
+  "target_date": "2026-05-22",          // the chat day we summarised
+  "daily_note_date": "2026-05-23",      // the daily note we wrote to
+  "daily_note_path": "/abs/.../2026-05-23.md",
+  "chats_count": 3,
+  "bytes_written": 412,
+  "renamed_legacy_header": false,       // true if "## About Aya" was renamed
+  "skipped_reason": null,               // "config_incomplete" | "vault_missing" | "empty" | null
+  "error": null,
+  "dry_run": false,
+  "preview": null                       // populated only when dry_run=true
+}
+```
+
+`ok: true` does NOT mean a write happened — check `skipped_reason`. A missing vault path is a state, not an error.
+
 ### Open Notebook
 
 | Method | Path | Body | Response |
@@ -267,7 +299,9 @@ SSE events:
 | Method | Returns | Used for |
 |---|---|---|
 | `pick_files()` | `[{filename, category, size, content?/data_base64?, error?}, ...]` | Native multi-select dialog. Filters by current model capabilities. |
+| `pick_folder()` | `{ok, path?, cancelled?}` | Native folder picker. Used by Settings → Obsidian → vault path. |
 | `export_chat(chat_id)` | `{ok, path?, cancelled?, error?}` | Native save dialog → writes chat JSON |
+| `quit_app()` | (no return) | Fully exit the process (close-button only minimises). Wired to Settings → Quit Logos. |
 
 The bridge runs methods on a pywebview-managed thread. Heavy I/O (PDF parse, large image read, native dialog blocking) happens here, not in Flask.
 
@@ -359,6 +393,40 @@ Built-in templates with placeholder substitution. Currently ships `SDXL_DEFAULT`
 ### `image_storage.py`
 Disk storage under `~/.local/share/logos/images/<chat_id>/`. `save()` writes bytes and returns a `Path`. `is_safe_path()` path-traversal guard for HTTP serving. `delete_for_chat()` removes a chat's image folder (called by `DELETE /api/chats/<id>`).
 
+### `obsidian_sync.py`
+
+Writes a digest of one day's chats into the user's Obsidian Daily Note for the following day. Pure stdlib — no new dependencies. All vault I/O lives in this single module; nothing else in the codebase opens vault files.
+
+**Public API:**
+- `sync_date(target_date: date, *, dry_run=False) -> dict` — summarise `target_date`'s chats into the daily note for `target_date + 1 day`.
+- `sync_yesterday(*, dry_run=False) -> dict` — convenience wrapper. Used by both the auto-trigger in `app.py` and the manual "Sync yesterday now" button in Settings.
+
+**Section-update algorithm** (`_update_section`): line-by-line scan, NOT regex. Three cases:
+
+1. File doesn't exist → create with just our `##` section.
+2. File exists with our header → replace the body (lines from after the header to the next `##` or EOF). **Idempotent** — same input produces byte-identical output.
+3. File exists without our header → append the section at EOF with a leading blank line. Other sections never touched.
+
+**Legacy header rename** (`LEGACY_HEADER = "## About Aya"`): if the new header is absent AND the legacy is present, the legacy header line is rewritten in-place to the configured header. Body is then replaced as usual. If both headers coexist, we never touch the legacy one — only the new one.
+
+**Idempotency contract (P-O1):** running the sync twice for the same `target_date` writes the same bytes. The auto-trigger in `app.py` enforces at-most-once-per-day via `~/.local/share/logos/obsidian_last_sync.txt`, but the module itself is safe to call repeatedly.
+
+**Path safety:** `_resolve_daily_note_path` rejects templates that would escape the vault root (`../escape.md`). Writes are atomic — temp file in the same directory + `os.replace`.
+
+**Digest formats:**
+- `titles` — one bullet per chat: `- 14:22 · <title>`
+- `excerpts` (default) — title bold + first user message as a blockquote, truncated to 240 chars
+- `summaries` — reserved for v1.5.1 (LLM-generated). Currently falls back to `excerpts`.
+
+**Skip paths** (return `ok=True` with a `skipped_reason`, not an error):
+- `config_incomplete` — `obsidian_vault_path` is empty.
+- `vault_missing` — path is set but not a directory.
+- `empty` — zero chats on the target date.
+
+**Smoke test:** `python3 backend/obsidian_sync.py` runs an in-module test that exercises all seven edge cases (create, idempotent replace, body update, append-to-existing, legacy rename, dual-header protection, path-escape protection) against temp files. Should always print `obsidian_sync smoke test: OK` before commit.
+
+**Auto-trigger** (in `app.py`): a daemon thread spawned just before `webview.start` calls `sync_yesterday()` at most once per local day. Marker file is updated **regardless of result** so a transient failure (e.g., vault temporarily unmounted) doesn't loop on every relaunch.
+
 ---
 
 ## 8. Frontend state machine
@@ -396,7 +464,10 @@ The settings overlay is a single modal containing a tab bar plus 6 panel divs, o
 | `prompt` | Editable system prompt (full-height textarea) |
 | `notebook` | Open Notebook API URL, UI URL, connect button, status, active notebook dropdown, refresh button, info line, large-notebook warning |
 | `image` | ComfyUI URL, workflow dropdown + custom JSON textarea, checkpoint/sampler/scheduler (auto-populated), w/h/steps/cfg, negative prompt, post-commentary toggle |
+| `obsidian` | Vault path + 📁 native folder picker, daily-note path template (with `{date}` placeholder), section header, digest-format dropdown, "Sync yesterday now" + "Preview…" buttons, inline status/preview area |
 | `memory` | Auto-loaded list of fact chips with delete buttons + refresh button |
+
+The settings footer also exposes **Quit Logos** — calls `Api.quit_app()` with a confirmation. This is the only reliable way to exit on desktops where the tray icon is not visible (notably vanilla GNOME without an AppIndicator extension).
 
 ---
 
@@ -539,3 +610,43 @@ Release: bump `VERSION` in `backend/version.py` → `./build_deb.sh` → commit 
 - `tests/regression/test_cases.json` — Test cases (v1.3.0)
 - `tools/replay.py` — Chat replay tool (v1.3.0)
 - `icons/logos-32.png` — Tray icon
+
+### v1.5.0 — Obsidian sync, taskbar fix, test-bug cleanup
+
+**Phase A — Obsidian backend:**
+- A1: `backend/obsidian_sync.py` — stdlib-only digest writer. Section-update algorithm handles create / idempotent replace / append-to-existing / legacy `## About Aya` → `## About Logos` rename / dual-header protection / path-escape protection. In-module smoke test covers all seven cases.
+- A2: `POST /api/obsidian/sync` and `GET /api/obsidian/preview` endpoints. Skip-reasons (`config_incomplete`, `vault_missing`, `empty`) returned as `ok=true` state, not errors.
+
+**Phase B — Settings UI:**
+- B1: New "Obsidian" Settings tab with 4 fields (vault path + 📁 picker, daily-note template, section header, digest format) plus "Sync yesterday now" and "Preview…" buttons. Preview renders inline.
+- B2: This documentation update.
+
+**Phase C — Auto-trigger:**
+- C1: Daemon thread in `app.py:main()` calls `obsidian_sync.sync_yesterday()` at most once per local day, tracked via `~/.local/share/logos/obsidian_last_sync.txt`. Fail-open: marker is written regardless of result so a transient failure doesn't retry on every launch.
+
+**Quit affordance + window-manager fix:**
+- `GLib.set_prgname("Logos")` + `set_application_name` + default window icon are now set BEFORE `webview.create_window`, aligning `WM_CLASS` with the `.desktop` file's `StartupWMClass`. This fixes the "minimize disappears the window" symptom where the taskbar couldn't bind the iconified window to the desktop entry.
+- `on_closing` handler is now fail-open: if `window.minimize()` raises, the close proceeds instead of being silently cancelled — so a broken minimize on some pywebview/Wayland combos no longer leaves the user with an invisible, un-closable process.
+- New `Quit Logos` button in Settings footer (calls `Api.quit_app()` via the JS bridge) — primary path for desktops where the tray icon isn't visible.
+
+**Notes button glyph:**
+- Header icon changed from `🗎` (emoji, colored on most fonts) to `▤` (U+25A4, monochrome — same visual family as `⊕ ⚙ ☰`). Removed the `#btn-notes-toggle` CSS override that was killing the border and forcing 18px font-size; it now inherits the standard `header button` style.
+
+**Test-harness fixes** (test-bug cleanup, not Logos bugs):
+- `code · python list comprehension`: removed `def` from `expected_keywords` — the prompt explicitly asks for a list comprehension.
+- `code · regex explanation`: removed `ηλεκτρονικ` from `expected_keywords` — the loanword "email" is acceptable Greek.
+- `date · current` (test_cases.json): `min_tokens` lowered from 10 to 5; a one-line date question deserves a one-line answer.
+- `date · current time` (test_cases_v2.json): replaced `expect_honest_uncertainty` with `expect_script_consistency` — Logos provides the current time via the system prompt, so the model SHOULD answer it.
+- `run.py`: `UNCERTAINTY_PHRASES` allowlist extended with clarification-request phrases (`διευκρινίστε`, `ολοκληρώστε`, `τι εννοείς`, `ασαφές`, `αμφίσημο`, `please clarify`, `what do you mean`, …). Asking for clarification now counts as "honest uncertainty", alongside admitting lack of knowledge.
+
+**New config keys** (additive, default-disabled):
+- `obsidian_vault_path: ""` — empty disables the entire feature.
+- `obsidian_daily_note_path: "Daily Notes/{date}.md"`
+- `obsidian_section_header: "## About Logos"`
+- `obsidian_digest_format: "excerpts"`
+
+**New files:**
+- `backend/obsidian_sync.py`
+- `roadmap-v1.5-obsidian.md`
+
+**No new dependencies.** Stdlib only.

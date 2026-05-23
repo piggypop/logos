@@ -14,6 +14,7 @@ import image_storage
 import image_workflows
 import memory as mem
 import notes as notes_store
+import obsidian_sync
 import ollama_client
 import open_notebook_client
 import prompts
@@ -535,6 +536,54 @@ def api_notes_export(note_id):
                 "Content-Disposition": f'attachment; filename="{filename}"',
             },
         )
+
+
+# ── Obsidian daily-note sync ─────────────────────────────
+
+
+def _parse_date_arg(s: str | None):
+    """Parse 'YYYY-MM-DD' → date, else None. Returns (date | None, error str | None)."""
+    if not s:
+        return None, None
+    try:
+        return datetime.strptime(s, "%Y-%m-%d").date(), None
+    except ValueError:
+        return None, f"invalid date {s!r} (expected YYYY-MM-DD)"
+
+
+@app.post("/api/obsidian/sync")
+def api_obsidian_sync():
+    """POST /api/obsidian/sync → run the digest for `date` (default: yesterday).
+
+    Body: { "date": "YYYY-MM-DD" (optional), "dry_run": bool (optional) }
+    Returns: the result dict from obsidian_sync.sync_date.
+    """
+    body = request.get_json(silent=True) or {}
+    the_date, err = _parse_date_arg(body.get("date"))
+    if err:
+        return jsonify({"error": err}), 400
+    dry_run = bool(body.get("dry_run", False))
+    if the_date is None:
+        result = obsidian_sync.sync_yesterday(dry_run=dry_run)
+    else:
+        result = obsidian_sync.sync_date(the_date, dry_run=dry_run)
+    return jsonify(result)
+
+
+@app.get("/api/obsidian/preview")
+def api_obsidian_preview():
+    """GET /api/obsidian/preview?date=YYYY-MM-DD → dry-run preview only.
+
+    Same as POST /api/obsidian/sync with dry_run=true. Defaults to yesterday.
+    """
+    the_date, err = _parse_date_arg(request.args.get("date"))
+    if err:
+        return jsonify({"error": err}), 400
+    if the_date is None:
+        result = obsidian_sync.sync_yesterday(dry_run=True)
+    else:
+        result = obsidian_sync.sync_date(the_date, dry_run=True)
+    return jsonify(result)
 
 
 # ── Chat (SSE streaming) ─────────────────────────────────

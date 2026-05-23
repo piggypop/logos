@@ -48,6 +48,16 @@ DEFAULTS = {
     # Per-model configuration overrides. Keys: model name, values: dict with
     # override keys (e.g. {"temperature": 0.4}). Global config remains unchanged.
     "model_overrides": {},
+    # ── Obsidian daily-note sync (see backend/obsidian_sync.py) ──
+    # Empty vault path disables the feature. {date} in the path template
+    # is rendered as YYYY-MM-DD; no other placeholders supported in v1.5.0.
+    "obsidian_vault_path": "",
+    "obsidian_daily_note_path": "Daily Notes/{date}.md",
+    "obsidian_section_header": "## About Logos",
+    # Digest format: "titles" (one bullet per chat) | "excerpts"
+    # (titles + first user message, default) | "summaries" (LLM-generated
+    # per chat, reserved for v1.5.1 — currently falls back to "excerpts").
+    "obsidian_digest_format": "excerpts",
 }
 
 

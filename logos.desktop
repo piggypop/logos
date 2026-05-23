@@ -3,7 +3,7 @@ Type=Application
 Name=Logos
 GenericName=Local LLM Chat
 Comment=Chat with local LLMs, web search, URL/YouTube reading, file attachments
-Exec=/usr/bin/logos
+Exec=env GSK_RENDERER=cairo WEBKIT_DISABLE_COMPOSITING_MODE=1 WEBKIT_DISABLE_DMABUF_RENDERER=1 LIBGL_ALWAYS_SOFTWARE=1 /usr/bin/logos
 Icon=logos
 Terminal=false
 Categories=Network;Chat;

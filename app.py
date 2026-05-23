@@ -18,6 +18,7 @@ sys.path.insert(0, os.path.join(BASE_DIR, "backend"))
 import chats as chats_store
 import config as cfg
 import file_extractor
+import obsidian_sync
 import ollama_client
 import webview
 from server import app
@@ -87,6 +88,17 @@ class Api:
         except Exception as e:
             return {"ok": False, "error": str(e)}
 
+    def pick_folder(self) -> dict:
+        """Open native folder picker (single-select). Used by Settings →
+        Obsidian to choose the vault directory."""
+        window = webview.windows[0]
+        result = window.create_file_dialog(webview.FOLDER_DIALOG)
+        if not result:
+            return {"ok": False, "cancelled": True}
+        # Pywebview returns a tuple/list even for single-select; take the first.
+        path = result[0] if isinstance(result, (list, tuple)) else result
+        return {"ok": True, "path": path}
+
     def quit_app(self):
         """Called from JS frontend as fallback Quit (Ctrl+Q / Settings button)."""
         _shutdown()
@@ -135,6 +147,74 @@ def _single_instance_listener(listener: socket.socket):
                     pass
         except Exception:
             time.sleep(0.5)
+
+
+# ── Obsidian daily-note auto-sync ──────────────────────────
+
+
+OBSIDIAN_LAST_SYNC_FILE = (
+    Path.home() / ".local" / "share" / "logos" / "obsidian_last_sync.txt"
+)
+
+
+def _obsidian_auto_sync_once():
+    """If we haven't synced today yet, sync yesterday's chats into today's
+    daily note. Runs at most once per local day per machine.
+
+    This is best-effort. Any failure (config not set, vault missing, parse
+    error, anything) is logged and swallowed — never raises into the
+    main thread.
+    """
+    from datetime import datetime  # local to keep the global import surface small
+
+    try:
+        today_iso = datetime.now().astimezone().date().isoformat()
+
+        # Read last-sync marker (if it exists)
+        try:
+            last = OBSIDIAN_LAST_SYNC_FILE.read_text(encoding="utf-8").strip()
+        except FileNotFoundError:
+            last = ""
+        except Exception:
+            last = ""
+
+        if last == today_iso:
+            return  # already synced today
+
+        # Run the sync. If config is incomplete (no vault path) this returns
+        # ok=True with skipped_reason="config_incomplete" — still fine, we
+        # mark today as done so we don't retry on every launch.
+        result = obsidian_sync.sync_yesterday()
+        if result.get("skipped_reason"):
+            print(
+                f"[obsidian_sync] auto: skipped ({result['skipped_reason']})",
+                file=sys.stderr,
+            )
+        elif result.get("error"):
+            print(f"[obsidian_sync] auto: error {result['error']}", file=sys.stderr)
+        else:
+            print(
+                "[obsidian_sync] auto: wrote {bytes} bytes for {n} chat(s) to {path}".format(
+                    bytes=result.get("bytes_written"),
+                    n=result.get("chats_count"),
+                    path=result.get("daily_note_path"),
+                ),
+                file=sys.stderr,
+            )
+
+        # Always update marker so a transient failure doesn't loop forever.
+        try:
+            OBSIDIAN_LAST_SYNC_FILE.parent.mkdir(parents=True, exist_ok=True)
+            OBSIDIAN_LAST_SYNC_FILE.write_text(today_iso, encoding="utf-8")
+        except Exception as e:
+            print(f"[obsidian_sync] could not write marker: {e}", file=sys.stderr)
+    except Exception as e:
+        print(f"[obsidian_sync] auto-sync crashed: {e}", file=sys.stderr)
+
+
+def start_obsidian_auto_sync():
+    """Spawn the auto-sync as a daemon thread so it never blocks startup."""
+    threading.Thread(target=_obsidian_auto_sync_once, daemon=True).start()
 
 
 # ── System tray ────────────────────────────────────────────
@@ -253,6 +333,33 @@ def main():
         # Another instance is running — we signalled it, now exit
         sys.exit(0)
 
+    # ── GTK identity: align WM_CLASS with the .desktop StartupWMClass ──
+    # Without this, pywebview's GTK backend sets WM_CLASS to its own default
+    # ("MainWindow" / "pywebview") and the taskbar fails to associate the
+    # window with /usr/share/applications/logos.desktop. The visible symptom
+    # is that window.minimize() appears to "hide" the window — the window IS
+    # iconified, but no taskbar entry exists to click it back. Setting the
+    # program name BEFORE any GTK widget is created fixes this on GTK3.
+    # Also sets the default window icon so the taskbar entry shows the logo.
+    try:
+        import gi
+
+        gi.require_version("Gtk", "3.0")
+        from gi.repository import GLib, Gtk  # noqa: E402
+
+        GLib.set_prgname("Logos")  # → WM_CLASS instance
+        GLib.set_application_name("Logos")  # → human-readable taskbar label
+
+        icon_path = Path(BASE_DIR) / "icons" / "logos-128.png"
+        if icon_path.exists():
+            try:
+                Gtk.Window.set_default_icon_from_file(str(icon_path))
+            except Exception as e:
+                print(f"WARNING: could not set default window icon: {e}")
+    except (ImportError, ValueError) as e:
+        # gi/Gtk not available (non-GTK backend, e.g. Qt on KDE). Skip silently.
+        print(f"INFO: GTK identity setup skipped: {e}")
+
     # ── Start Flask ────────────────────────────────────────
     port = cfg.load().get("port", 17842)
     threading.Thread(target=run_flask, args=(port,), daemon=True).start()
@@ -268,13 +375,18 @@ def main():
         js_api=Api(),
     )
 
-    # ── F3: Close → minimize ───────────────────────────────
+    # ── F3: Close → minimize, with a fail-open escape hatch ────
+    # If minimize() raises (some pywebview/GTK combos do under Wayland),
+    # we let the close proceed instead of cancelling it. Without this
+    # fallback a broken minimize() leaves the user with a window that
+    # neither closes nor reappears in the taskbar.
     def on_closing():
         try:
             window.minimize()
-        except Exception:
-            pass
-        return False  # cancel the close
+            return False  # minimize succeeded → cancel the close
+        except Exception as e:
+            print(f"WARNING: window.minimize() failed ({e}) — allowing close")
+            return True  # let the close proceed so the user isn't stuck
 
     try:
         window.events.closing += on_closing
@@ -289,6 +401,10 @@ def main():
 
     # ── F2: Build tray icon ────────────────────────────────
     build_tray(window)
+
+    # ── Obsidian: sync yesterday into today's daily note ──
+    # Runs at most once per local day. Silent no-op if vault path is unset.
+    start_obsidian_auto_sync()
 
     # ── on_ready: switch from splash to real UI ────────────
     def on_ready():

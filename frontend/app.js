@@ -950,6 +950,17 @@ async function openSettings() {
     !!c.comfyui_post_commentary;
   updateComfyuiCustomVisibility();
 
+  // Obsidian fields
+  document.getElementById("s-obsidian-vault-path").value =
+    c.obsidian_vault_path || "";
+  document.getElementById("s-obsidian-daily-note-path").value =
+    c.obsidian_daily_note_path || "Daily Notes/{date}.md";
+  document.getElementById("s-obsidian-section-header").value =
+    c.obsidian_section_header || "## About Logos";
+  document.getElementById("s-obsidian-digest-format").value =
+    c.obsidian_digest_format || "excerpts";
+  document.getElementById("s-obsidian-status").textContent = "";
+
   updateProviderFieldsVisibility();
   await refreshNotebooks(c.active_notebook_id || "");
   await refreshComfyui(c);
@@ -1105,8 +1116,128 @@ async function saveSettings() {
     system_prompt: document.getElementById("s-system-prompt").value,
     temperature: hasTempOverride() ? currentConfig.temperature : temp,
     model_overrides: currentConfig.model_overrides || {},
+    obsidian_vault_path: document
+      .getElementById("s-obsidian-vault-path")
+      .value.trim(),
+    obsidian_daily_note_path:
+      document.getElementById("s-obsidian-daily-note-path").value.trim() ||
+      "Daily Notes/{date}.md",
+    obsidian_section_header:
+      document.getElementById("s-obsidian-section-header").value.trim() ||
+      "## About Logos",
+    obsidian_digest_format: document.getElementById("s-obsidian-digest-format")
+      .value,
   });
   closeSettings();
+}
+
+// ── Obsidian sync controls ───────────────────────────────────────────────────
+
+async function obsidianBrowseVault() {
+  if (!window.pywebview || !window.pywebview.api?.pick_folder) {
+    setObsidianStatus("Folder picker not available outside the desktop app.");
+    return;
+  }
+  try {
+    const r = await window.pywebview.api.pick_folder();
+    if (r?.ok && r.path) {
+      document.getElementById("s-obsidian-vault-path").value = r.path;
+      setObsidianStatus(`Vault set to ${r.path}. Don't forget to Save.`);
+    }
+  } catch (e) {
+    console.error("pick_folder failed", e);
+    setObsidianStatus("Folder picker failed — see console.");
+  }
+}
+
+function setObsidianStatus(text, isError = false) {
+  const el = document.getElementById("s-obsidian-status");
+  if (!el) return;
+  el.textContent = text;
+  el.style.color = isError ? "var(--error)" : "";
+}
+
+function describeSyncResult(r) {
+  if (!r) return "No response from server.";
+  if (r.error) return `Error: ${r.error}`;
+  if (r.skipped_reason === "config_incomplete")
+    return "Vault path not configured — fill it in above and Save.";
+  if (r.skipped_reason === "vault_missing")
+    return `Vault path does not exist on disk: ${r.daily_note_path || ""}`;
+  if (r.skipped_reason === "empty")
+    return `No chats on ${r.target_date}; nothing to sync.`;
+  const noun = r.dry_run ? "Would write" : "Wrote";
+  const rename = r.renamed_legacy_header
+    ? " (renamed '## About Aya' → configured header)"
+    : "";
+  return `${noun} ${r.bytes_written || "?"} bytes for ${r.chats_count} chat(s) from ${r.target_date} → ${r.daily_note_path}${rename}.`;
+}
+
+async function obsidianSyncNow() {
+  setObsidianStatus("Syncing…");
+  try {
+    const r = await fetch(`${API}/api/obsidian/sync`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const data = await r.json();
+    setObsidianStatus(describeSyncResult(data), !data.ok || !!data.error);
+  } catch (e) {
+    console.error("obsidian sync failed", e);
+    setObsidianStatus(`Sync failed: ${e.message || e}`, true);
+  }
+}
+
+async function obsidianPreview() {
+  setObsidianStatus("Building preview…");
+  try {
+    const r = await fetch(`${API}/api/obsidian/preview`);
+    const data = await r.json();
+    if (!data.ok || data.error) {
+      setObsidianStatus(describeSyncResult(data), true);
+      return;
+    }
+    if (data.skipped_reason) {
+      setObsidianStatus(describeSyncResult(data));
+      return;
+    }
+    // Show the preview body inline in the status area.
+    const el = document.getElementById("s-obsidian-status");
+    el.style.color = "";
+    el.innerHTML = "";
+    const header = document.createElement("div");
+    header.textContent = `Preview — would write to ${data.daily_note_path}:`;
+    el.appendChild(header);
+    const pre = document.createElement("pre");
+    pre.style.cssText =
+      "margin-top: 6px; padding: 8px; background: var(--bg3); " +
+      "border: 1px solid var(--border); white-space: pre-wrap; " +
+      "max-height: 200px; overflow: auto; font-size: 11px;";
+    pre.textContent = data.preview || "";
+    el.appendChild(pre);
+  } catch (e) {
+    console.error("obsidian preview failed", e);
+    setObsidianStatus(`Preview failed: ${e.message || e}`, true);
+  }
+}
+
+async function quitLogos() {
+  if (!window.pywebview?.api?.quit_app) {
+    alert("Quit is only available inside the desktop app.");
+    return;
+  }
+  if (
+    !confirm(
+      "Quit Logos? This fully exits the app. The close button only minimises it.",
+    )
+  )
+    return;
+  try {
+    await window.pywebview.api.quit_app();
+  } catch (e) {
+    console.error("quit failed", e);
+  }
 }
 
 // ── Event Listeners ───────────────────────────────────────────────────────────
@@ -1156,6 +1287,16 @@ document
 document
   .getElementById("settings-cancel")
   .addEventListener("click", closeSettings);
+document.getElementById("settings-quit").addEventListener("click", quitLogos);
+document
+  .getElementById("s-obsidian-browse")
+  .addEventListener("click", obsidianBrowseVault);
+document
+  .getElementById("s-obsidian-sync")
+  .addEventListener("click", obsidianSyncNow);
+document
+  .getElementById("s-obsidian-preview")
+  .addEventListener("click", obsidianPreview);
 document
   .getElementById("settings-save")
   .addEventListener("click", saveSettings);

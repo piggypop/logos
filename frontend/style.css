@@ -962,6 +962,12 @@ footer {
     color: var(--accent);
 }
 
+.obsidian-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
 .settings-footer {
     padding: 14px 20px;
     border-top: 1px solid var(--border);
@@ -1165,15 +1171,8 @@ footer {
     border-color: var(--error);
 }
 
-#btn-notes-toggle {
-    background: none;
-    border: none;
-    color: var(--fg);
-    cursor: pointer;
-    font-size: 18px;
-    padding: 0 4px;
-}
-
-#btn-notes-toggle:hover {
-    color: var(--accent);
-}
+/* #btn-notes-toggle inherits from `header button` so it matches the other
+ * header icons (⊕ ⚙ ☰) — same border, size, color, and hover state.
+ * The previous override here removed the border and made it 18px, which
+ * made the icon look out of place. Hover style also lives on the generic
+ * `header button:hover` rule above. */
