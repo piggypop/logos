@@ -22,3 +22,8 @@ logos_*.deb
 .env
 .venv/
 venv/
+
+# Test/scratch files
+comfy-testing.md
+*.zip
+___test_cases.json
