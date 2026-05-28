@@ -36,6 +36,47 @@ const notesDetailClose = document.getElementById("notes-detail-close");
 const notesDetailDelete = document.getElementById("notes-detail-delete");
 let currentNoteId = null;
 
+// ── External link interception ───────────────────────────────────────────────
+// pywebview's WebKit2GTK / QtWebEngine WebView tries to navigate in-place when
+// an anchor with target="_blank" is clicked, which breaks real-world flows
+// (e.g. Google sign-in refusing to render inside the embedded view,
+// 2026-05-23 on speakleash.org.pl). We intercept clicks on external http(s)
+// anchors and route them through Api.open_external() in app.py, which calls
+// webbrowser.open() to launch the user's actual default browser. Falls back
+// to default anchor behavior in dev (no pywebview).
+document.addEventListener(
+  "click",
+  (e) => {
+    // Find the nearest enclosing <a> — markdown content can wrap the
+    // anchor text in <strong>/<em>/etc, so e.target may not be the anchor.
+    const a = e.target.closest && e.target.closest("a[href]");
+    if (!a) return;
+
+    const href = a.getAttribute("href") || "";
+    // Only intercept absolute http(s) URLs. Leave in-page hash links,
+    // relative paths, mailto:, etc. to default behavior.
+    if (!/^https?:\/\//i.test(href)) return;
+
+    // Modifier keys / middle-click: respect user intent (still open
+    // externally — pywebview can't honour ctrl+click anyway, so funnelling
+    // through the bridge gives the consistent "system browser" answer).
+    if (
+      window.pywebview &&
+      window.pywebview.api &&
+      window.pywebview.api.open_external
+    ) {
+      e.preventDefault();
+      window.pywebview.api.open_external(href).then((r) => {
+        if (r && r.ok === false) {
+          console.error("open_external failed:", r.error, href);
+        }
+      });
+    }
+    // else: dev mode (browser, no pywebview bridge) — anchor opens normally.
+  },
+  true, // capture, so we win over any other click handler on the anchor
+);
+
 // ── Init ─────────────────────────────────────────────────────────────────────
 async function init() {
   await loadConfig();
@@ -160,6 +201,7 @@ async function streamResponse(forceSearch = false) {
           assistantBubble
             .querySelectorAll("pre code")
             .forEach((el) => hljs.highlightElement(el));
+          attachCodeCopyButtons(assistantBubble);
           conversationHistory.push({
             role: "assistant",
             content: buffer,
@@ -209,6 +251,28 @@ function renderSources(msgEl, sources) {
   });
   wrap.append(label, ol);
   msgEl.appendChild(wrap);
+}
+
+function attachCodeCopyButtons(container) {
+  container.querySelectorAll("pre").forEach((pre) => {
+    if (pre.querySelector(".code-copy-btn")) return;
+    const btn = document.createElement("button");
+    btn.className = "code-copy-btn";
+    btn.textContent = "⎘";
+    btn.title = "Copy code";
+    btn.onclick = async () => {
+      const codeEl = pre.querySelector("code");
+      const text = codeEl ? codeEl.innerText : pre.innerText;
+      try {
+        await navigator.clipboard.writeText(text);
+        btn.textContent = "✓";
+        setTimeout(() => { btn.textContent = "⎘"; }, 1200);
+      } catch (e) {
+        console.error("Copy failed:", e);
+      }
+    };
+    pre.appendChild(btn);
+  });
 }
 
 function attachMessageActions(msgEl) {
@@ -395,6 +459,28 @@ function appendMessage(role, content, attachments) {
   msg.appendChild(body);
   if (attachments && attachments.length) {
     msg.appendChild(renderMessageAttachments(attachments));
+  }
+  if (role === "user") {
+    const bar = document.createElement("div");
+    bar.className = "msg-actions";
+    const copyBtn = document.createElement("button");
+    copyBtn.className = "msg-action-btn";
+    copyBtn.textContent = "⎘ Copy";
+    copyBtn.onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(content);
+        copyBtn.textContent = "✓ Copied";
+        copyBtn.classList.add("flash");
+        setTimeout(() => {
+          copyBtn.textContent = "⎘ Copy";
+          copyBtn.classList.remove("flash");
+        }, 1200);
+      } catch (e) {
+        console.error("Copy failed:", e);
+      }
+    };
+    bar.appendChild(copyBtn);
+    msg.appendChild(bar);
   }
   messagesEl.appendChild(msg);
   return body;
@@ -684,6 +770,7 @@ async function loadChat(chatId) {
         bubble
           .querySelectorAll("pre code")
           .forEach((el) => hljs.highlightElement(el));
+        attachCodeCopyButtons(bubble);
         const msgEl = bubble.closest(".msg");
         if (m.sources && m.sources.length) renderSources(msgEl, m.sources);
         attachMessageActions(msgEl);
@@ -930,6 +1017,7 @@ async function openSettings() {
     c.search_results_count || c.searxng_results_count || 5;
   document.getElementById("s-auto-search").checked = !!c.auto_search_enabled;
   document.getElementById("s-user-location").value = c.user_location || "";
+  document.getElementById("s-response-language").value = c.response_language || "auto";
   document.getElementById("s-notebook-url").value = c.open_notebook_url || "";
   document.getElementById("s-notebook-ui-url").value =
     c.open_notebook_ui_url || "";
@@ -946,6 +1034,10 @@ async function openSettings() {
   document.getElementById("s-comfyui-height").value = c.comfyui_height ?? 1024;
   document.getElementById("s-comfyui-negative").value =
     c.comfyui_negative_prompt || "";
+  document.getElementById("s-comfyui-guidance").value = c.comfyui_guidance ?? 3.5;
+  document.getElementById("s-comfyui-denoise").value = c.comfyui_denoise ?? 0.75;
+  document.getElementById("s-comfyui-lora-sm").value = c.comfyui_lora_strength_model ?? 0.8;
+  document.getElementById("s-comfyui-lora-sc").value = c.comfyui_lora_strength_clip ?? 0.8;
   document.getElementById("s-comfyui-commentary").checked =
     !!c.comfyui_post_commentary;
   updateComfyuiCustomVisibility();
@@ -1084,6 +1176,7 @@ async function saveSettings() {
     ),
     auto_search_enabled: document.getElementById("s-auto-search").checked,
     user_location: document.getElementById("s-user-location").value.trim(),
+    response_language: document.getElementById("s-response-language").value,
     open_notebook_url: document.getElementById("s-notebook-url").value.trim(),
     open_notebook_ui_url: document
       .getElementById("s-notebook-ui-url")
@@ -1111,6 +1204,15 @@ async function saveSettings() {
       parseInt(document.getElementById("s-comfyui-height").value) || 1024,
     comfyui_negative_prompt:
       document.getElementById("s-comfyui-negative").value,
+    comfyui_guidance:
+      parseFloat(document.getElementById("s-comfyui-guidance").value) || 3.5,
+    comfyui_denoise:
+      parseFloat(document.getElementById("s-comfyui-denoise").value) || 0.75,
+    comfyui_lora: document.getElementById("s-comfyui-lora").value,
+    comfyui_lora_strength_model:
+      parseFloat(document.getElementById("s-comfyui-lora-sm").value) || 0.8,
+    comfyui_lora_strength_clip:
+      parseFloat(document.getElementById("s-comfyui-lora-sc").value) || 0.8,
     comfyui_post_commentary: document.getElementById("s-comfyui-commentary")
       .checked,
     system_prompt: document.getElementById("s-system-prompt").value,
@@ -1408,6 +1510,26 @@ function fillSelect(el, options, selected) {
   }
 }
 
+function _fillLoraSelect(loras, selected) {
+  const sel = document.getElementById("s-comfyui-lora");
+  // Always keep the "none" option first
+  while (sel.options.length > 1) sel.remove(1);
+  for (const l of loras) {
+    const opt = document.createElement("option");
+    opt.value = l;
+    opt.textContent = l;
+    if (l === selected) opt.selected = true;
+    sel.appendChild(opt);
+  }
+  if (selected && !loras.includes(selected)) {
+    const opt = document.createElement("option");
+    opt.value = selected;
+    opt.textContent = `${selected} (not on server)`;
+    opt.selected = true;
+    sel.insertBefore(opt, sel.children[1]);
+  }
+}
+
 async function refreshComfyui(c, { force = false } = {}) {
   const status = document.getElementById("s-comfyui-status");
   const ckptSel = document.getElementById("s-comfyui-checkpoint");
@@ -1437,11 +1559,13 @@ async function refreshComfyui(c, { force = false } = {}) {
       btnImage.disabled = true;
       return;
     }
-    status.textContent = `connected · ${data.checkpoints.length} checkpoints`;
+    const loraCount = (data.loras || []).length;
+    status.textContent = `connected · ${data.checkpoints.length} checkpoints${loraCount ? ` · ${loraCount} LoRAs` : ""}`;
     status.style.color = "var(--accent)";
     fillSelect(ckptSel, data.checkpoints, c.comfyui_checkpoint);
     fillSelect(samplerSel, data.samplers, c.comfyui_sampler);
     fillSelect(schedSel, data.schedulers, c.comfyui_scheduler);
+    _fillLoraSelect(data.loras || [], c.comfyui_lora || "");
     btnImage.disabled = false;
   } catch (e) {
     status.textContent = "error: " + (e.message || e);
@@ -1470,6 +1594,7 @@ const imgPrompt = document.getElementById("img-prompt");
 const imgNegative = document.getElementById("img-negative");
 const imgProgress = document.getElementById("img-progress");
 const imgGenerate = document.getElementById("img-generate");
+const imgLivePreview = document.getElementById("img-live-preview");
 let imgGenerating = false;
 
 function openImageModal() {
@@ -1477,6 +1602,8 @@ function openImageModal() {
   imgPrompt.value = userInput.value.trim(); // pre-fill with current input if any
   imgNegative.value = "";
   imgProgress.textContent = "";
+  imgLivePreview.classList.add("hidden");
+  imgLivePreview.src = "";
   imgGenerating = false;
   imgGenerate.disabled = false;
   imgOverlay.classList.remove("hidden");
@@ -1528,6 +1655,11 @@ async function generateImage() {
           imgProgress.textContent = "queued · waiting for worker…";
         } else if (ev.type === "progress") {
           imgProgress.textContent = `step ${ev.value}/${ev.max}`;
+        } else if (ev.type === "preview") {
+          // Live preview frame from ComfyUI during sampling
+          const mime = ev.mime || "image/jpeg";
+          imgLivePreview.src = `data:${mime};base64,${ev.data}`;
+          imgLivePreview.classList.remove("hidden");
         } else if (ev.type === "image") {
           imageResult = ev;
         } else if (ev.type === "error") {
@@ -1628,11 +1760,27 @@ function renderAssistantImage(msg) {
   img.src = msg.image.url;
   img.alt = msg.image.prompt || "";
   img.onclick = () => openImageViewer(msg.image.url);
-  const meta = document.createElement("div");
-  meta.className = "msg-image-meta";
+  const meta = document.createElement('div');
+  meta.className = 'msg-image-meta';
   const p = msg.image.params || {};
-  meta.textContent = `“${msg.image.prompt}” · ${p.width}×${p.height} · ${p.steps} steps · seed ${p.seed} · ${p.checkpoint || "?"}`;
-  wrap.append(img, meta);
+  meta.textContent = '“' + msg.image.prompt + '” · ' + p.width + '×' + p.height + ' · ' + p.steps + ' steps · seed ' + p.seed + ' · ' + (p.checkpoint || '?');
+
+  const dlBtn = document.createElement('button');
+  dlBtn.className = 'msg-image-download';
+  dlBtn.title = 'Save image';
+  dlBtn.textContent = '⬇ Save';
+  dlBtn.onclick = async () => {
+    const rel = relativeImagePath(msg.image.path);
+    const filename = msg.image.filename || 'logos-image.png';
+    if (window.pywebview && window.pywebview.api) {
+      await window.pywebview.api.save_image(rel, filename);
+    } else {
+      // fallback: open in new tab so user can right-click save
+      window.open(msg.image.url, '_blank');
+    }
+  };
+
+  wrap.append(img, meta, dlBtn);
   body.appendChild(wrap);
 
   root.append(roleLabel, body);
@@ -1933,10 +2081,33 @@ function toggleExportMenu(e) {
   }, 0);
 }
 
-function downloadNote(fmt) {
+async function downloadNote(fmt) {
   if (!currentNoteId) return;
+
+  // Prefer the native save dialog inside pywebview — the WebKit/QtWebEngine
+  // backends don't bind a download handler, so a plain <a download> click
+  // on a Content-Disposition: attachment response is silently dropped.
+  if (
+    window.pywebview &&
+    window.pywebview.api &&
+    window.pywebview.api.export_note
+  ) {
+    try {
+      const result = await window.pywebview.api.export_note(
+        currentNoteId,
+        fmt,
+      );
+      if (result && result.ok === false && !result.cancelled) {
+        alert("Export failed: " + (result.error || "unknown"));
+      }
+    } catch (e) {
+      alert("Export failed: " + (e && e.message ? e.message : e));
+    }
+    return;
+  }
+
+  // Fallback for development outside pywebview (plain browser): anchor download.
   const url = `${API}/api/notes/${encodeURIComponent(currentNoteId)}/export?fmt=${fmt}`;
-  // Use a hidden anchor for reliable download in pywebview
   const a = document.createElement("a");
   a.href = url;
   a.download = "";

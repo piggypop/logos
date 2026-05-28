@@ -62,6 +62,7 @@ def _build_system_prompt(
     has_notebook: bool = False,
     user_message: str = "",
     source_quality_block: str = "",
+    search_attempted_but_empty: bool = False,
 ) -> str:
     """Compose the final system message via the central prompt module."""
     now = datetime.now().astimezone()
@@ -80,7 +81,9 @@ def _build_system_prompt(
         has_notebook=has_notebook,
         sources_block=sources_block,
         detected_language=detected_language,
+        preferred_language="" if c.get("response_language", "auto") in ("", "auto") else (c.get("response_language") or "").strip(),
         source_quality_block=source_quality_block,
+        search_attempted_but_empty=search_attempted_but_empty,
     )
 
 
@@ -287,8 +290,51 @@ def comfyui_status():
             "checkpoints": d["checkpoints"],
             "samplers": d["samplers"],
             "schedulers": d["schedulers"],
+            "loras": d.get("loras", []),
         }
     )
+
+
+@app.post("/api/comfyui/upload")
+def comfyui_upload():
+    """Upload an image to ComfyUI's input/ directory for use in img2img workflows.
+
+    Accepts either:
+      • multipart/form-data with field 'image' (binary file)
+      • JSON body with field 'data' (base64-encoded image) and optional 'filename'
+
+    Returns: {ok, name} where name is the filename to use in LoadImage nodes.
+    """
+    c = cfg.load()
+    url = c.get("comfyui_url") or ""
+    if not url:
+        return jsonify({"ok": False, "error": "ComfyUI URL not configured"}), 400
+
+    image_bytes: bytes | None = None
+    filename = "logos-input.png"
+
+    if request.content_type and "multipart" in request.content_type:
+        f = request.files.get("image")
+        if not f:
+            return jsonify({"ok": False, "error": "no image file in request"}), 400
+        image_bytes = f.read()
+        filename = f.filename or filename
+    else:
+        body = request.json or {}
+        raw_b64 = body.get("data", "")
+        if not raw_b64:
+            return jsonify({"ok": False, "error": "no image data in request"}), 400
+        import base64 as _b64
+        try:
+            image_bytes = _b64.b64decode(raw_b64)
+        except Exception:
+            return jsonify({"ok": False, "error": "invalid base64 data"}), 400
+        filename = body.get("filename", filename)
+
+    stored_name = comfyui_client.upload_image(url, image_bytes, filename)
+    if stored_name is None:
+        return jsonify({"ok": False, "error": "ComfyUI upload failed"}), 502
+    return jsonify({"ok": True, "name": stored_name})
 
 
 @app.post("/api/comfyui/generate")
@@ -296,14 +342,23 @@ def comfyui_generate():
     """SSE stream:
         {type: 'queued', prompt_id}
         {type: 'progress', value, max, node}
+        {type: 'preview', data, mime}        ← live preview (base64 JPEG/PNG)
         {type: 'image', path, prompt, params}
         {type: 'error', message}
-    Body: {prompt, chat_id?, overrides?: {checkpoint, steps, width, height, ...}}
+
+    Body:
+      prompt        — text prompt (required)
+      chat_id       — chat to attach image to (optional)
+      input_image   — base64 image for img2img workflows (optional)
+      overrides     — dict of param overrides: {checkpoint, steps, width, height,
+                       cfg, sampler, scheduler, negative, seed, denoise, guidance,
+                       lora, lora_strength_model, lora_strength_clip}
     """
     body = request.json or {}
     user_prompt = (body.get("prompt") or "").strip()
     chat_id = body.get("chat_id") or None
     overrides = body.get("overrides") or {}
+    input_image_b64 = body.get("input_image") or ""  # base64 for img2img
 
     if not user_prompt:
         return jsonify({"error": "prompt required"}), 400
@@ -318,24 +373,58 @@ def comfyui_generate():
         return jsonify({"error": f"workflow '{wf_name}' invalid"}), 400
 
     seed = overrides.get("seed") or comfyui_client.new_seed()
+
+    # Flux uses guidance instead of CFG; img2img adds denoise
+    is_flux = wf_name == "flux-default"
     params = {
         "prompt": user_prompt,
         "negative": overrides.get("negative", c.get("comfyui_negative_prompt", "")),
         "checkpoint": overrides.get("checkpoint", c.get("comfyui_checkpoint", "")),
         "seed": int(seed),
-        "steps": int(overrides.get("steps", c.get("comfyui_steps", 30))),
+        "steps": int(overrides.get("steps", c.get("comfyui_steps", 20 if is_flux else 30))),
         "cfg": float(overrides.get("cfg", c.get("comfyui_cfg", 7.5))),
+        "guidance": float(overrides.get("guidance", c.get("comfyui_guidance", 3.5))),
         "sampler": overrides.get("sampler", c.get("comfyui_sampler", "euler")),
-        "scheduler": overrides.get("scheduler", c.get("comfyui_scheduler", "normal")),
+        "scheduler": overrides.get("scheduler", c.get("comfyui_scheduler", "simple" if is_flux else "normal")),
         "width": int(overrides.get("width", c.get("comfyui_width", 1024))),
         "height": int(overrides.get("height", c.get("comfyui_height", 1024))),
+        "denoise": float(overrides.get("denoise", c.get("comfyui_denoise", 0.75))),
+        "input_image": "",  # filled below if img2img
     }
+
+    # LoRA injection (optional — from config or per-request override)
+    lora_name = overrides.get("lora") or c.get("comfyui_lora") or ""
+    lora_sm = float(overrides.get("lora_strength_model", c.get("comfyui_lora_strength_model", 0.8)))
+    lora_sc = float(overrides.get("lora_strength_clip", c.get("comfyui_lora_strength_clip", 0.8)))
+
     workflow = image_workflows.render(template, params)
+    if lora_name:
+        workflow = image_workflows.inject_lora(workflow, lora_name, lora_sm, lora_sc)
+
     client_id = comfyui_client.new_client_id()
 
     def generate():
+        # Upload input image for img2img workflows before submitting
+        if input_image_b64 and wf_name in ("img2img-default", "custom"):
+            import base64 as _b64
+            try:
+                img_bytes = _b64.b64decode(input_image_b64)
+                stored = comfyui_client.upload_image(url, img_bytes, "logos-img2img-input.png")
+            except Exception as e:
+                stored = None
+            if not stored:
+                yield f"data: {json.dumps({'type': 'error', 'message': 'Failed to upload input image to ComfyUI'})}\n\n"
+                return
+            # Re-render with the actual uploaded filename
+            params["input_image"] = stored
+            final_workflow = image_workflows.render(template, params)
+            if lora_name:
+                final_workflow = image_workflows.inject_lora(final_workflow, lora_name, lora_sm, lora_sc)
+        else:
+            final_workflow = workflow
+
         try:
-            prompt_id = comfyui_client.submit_prompt(url, workflow, client_id)
+            prompt_id = comfyui_client.submit_prompt(url, final_workflow, client_id)
             if not prompt_id:
                 yield f"data: {json.dumps({'type': 'error', 'message': 'ComfyUI rejected the workflow (check checkpoint name and that all required custom nodes are installed)'})}\n\n"
                 sys.stdout.flush()
@@ -346,6 +435,10 @@ def comfyui_generate():
             image_outputs = []
             for ev in comfyui_client.stream_progress(url, client_id, prompt_id):
                 if ev["type"] == "progress":
+                    yield f"data: {json.dumps(ev)}\n\n"
+                    sys.stdout.flush()
+                elif ev["type"] == "preview":
+                    # Live preview frame — forward as-is (base64 image)
                     yield f"data: {json.dumps(ev)}\n\n"
                     sys.stdout.flush()
                 elif ev["type"] == "executed":
@@ -388,6 +481,9 @@ def comfyui_generate():
                         "checkpoint": params["checkpoint"],
                         "sampler": params["sampler"],
                         "cfg": params["cfg"],
+                        "guidance": params["guidance"],
+                        "denoise": params["denoise"],
+                        "lora": lora_name,
                         "workflow": wf_name,
                     },
                 }
@@ -689,12 +785,19 @@ def chat():
                 else ""
             )
 
+            # ── Empty-search signal: search ran but found nothing ──
+            # Without this flag the model has no way to distinguish "no
+            # search was attempted" from "search returned zero results"
+            # and falls back to false denials like "I have no internet".
+            search_attempted_but_empty = do_web_search and not search_results
+
             system_prompt = _build_system_prompt(
                 c,
                 sources_block=sources_block,
                 source_quality_block=source_quality_block,
                 has_notebook=bool(notebook_sources),
                 user_message=last_user_message,
+                search_attempted_but_empty=search_attempted_but_empty,
             )
 
             # ── Debug: log assembled system prompt (Phase A1) ──
@@ -734,6 +837,7 @@ def chat():
                 system_prompt,
                 c["ollama_host"],
                 cfg.effective(c, "temperature", c["ollama_model"]),
+                num_ctx=cfg.effective(c, "num_ctx", c["ollama_model"]),
             ):
                 assistant_buffer.append(token)
                 yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"

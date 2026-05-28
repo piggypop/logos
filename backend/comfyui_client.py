@@ -7,9 +7,17 @@ from /view by filename.
 
 For Logos integration we keep one or more workflow templates (with placeholders
 like {{PROMPT}}, {{CHECKPOINT}}, {{SEED}}, etc.) and substitute before submit.
+
+WebSocket binary frame format (ComfyUI preview images):
+  bytes 0-3  : event type (uint32 big-endian); 1 = PREVIEW_IMAGE
+  bytes 4-7  : image format (uint32 big-endian); 1 = JPEG, 2 = PNG
+  bytes 8+   : raw image bytes (JPEG or PNG)
 """
+import base64
+import io
 import json
 import random
+import struct
 import sys
 import time
 from urllib.parse import urlencode, urlparse
@@ -105,6 +113,17 @@ def list_schedulers(base_url: str) -> list[str]:
         return []
 
 
+def list_loras(base_url: str) -> list[str]:
+    """Returns list of installed LoRA filenames."""
+    info = object_info(base_url)
+    if not info:
+        return []
+    try:
+        return list(info["LoraLoader"]["input"]["required"]["lora_name"][0])
+    except Exception:
+        return []
+
+
 def discover(base_url: str) -> dict:
     """Convenience: bundle all discovery results."""
     info = object_info(base_url)
@@ -125,6 +144,7 @@ def discover(base_url: str) -> dict:
         "checkpoints": _safe("CheckpointLoaderSimple", ["input", "required", "ckpt_name"]),
         "samplers": _safe("KSampler", ["input", "required", "sampler_name"]),
         "schedulers": _safe("KSampler", ["input", "required", "scheduler"]),
+        "loras": _safe("LoraLoader", ["input", "required", "lora_name"]),
         "node_types": sorted(info.keys()),
     }
 
@@ -186,7 +206,18 @@ def stream_progress(base_url: str, client_id: str, prompt_id: str, timeout: floa
             except Exception:
                 continue
             if not isinstance(raw, str):
-                # binary frame = preview image; skip for now
+                # binary frame = preview image (ComfyUI sends these during sampling)
+                # Format: 4-byte event type + 4-byte image format + raw image bytes
+                try:
+                    if len(raw) > 8:
+                        event_type = struct.unpack(">I", raw[:4])[0]
+                        img_format = struct.unpack(">I", raw[4:8])[0]
+                        if event_type == 1:  # PREVIEW_IMAGE
+                            mime = "image/png" if img_format == 2 else "image/jpeg"
+                            b64 = base64.b64encode(raw[8:]).decode("ascii")
+                            yield {"type": "preview", "data": b64, "mime": mime}
+                except Exception:
+                    pass
                 continue
             try:
                 msg = json.loads(raw)
@@ -256,6 +287,38 @@ def _poll_progress(base_url: str, prompt_id: str, timeout: float):
             pass
         time.sleep(1.0)
     yield {"type": "error", "message": "timeout"}
+
+
+def upload_image(
+    base_url: str,
+    image_bytes: bytes,
+    filename: str = "input.png",
+    overwrite: bool = True,
+    timeout: float = 30.0,
+) -> str | None:
+    """Upload an image to ComfyUI's input/ directory via POST /upload/image.
+    Returns the stored filename (as ComfyUI refers to it) or None on error.
+    Use the returned name as the value of a LoadImage node's 'image' input.
+    """
+    try:
+        files = {"image": (filename, io.BytesIO(image_bytes), "image/png")}
+        data = {"type": "input", "overwrite": "true" if overwrite else "false"}
+        r = httpx.post(
+            f"{_normalize(base_url)}/upload/image",
+            files=files,
+            data=data,
+            timeout=timeout,
+        )
+        r.raise_for_status()
+        resp = r.json()
+        # ComfyUI returns {"name": "...", "subfolder": "...", "type": "input"}
+        name = resp.get("name") or filename
+        subfolder = resp.get("subfolder", "")
+        return f"{subfolder}/{name}" if subfolder else name
+    except Exception as e:
+        print(f"[comfyui_client] upload_image error: {e}", file=sys.stderr)
+        sys.stderr.flush()
+        return None
 
 
 def fetch_image(base_url: str, filename: str, subfolder: str = "", folder_type: str = "output") -> bytes | None:

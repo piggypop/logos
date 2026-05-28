@@ -7,4 +7,4 @@
 
 ## Response
 
-The sea is calm today and the sky is cloudless blue.
+The sea is calm today and the sky is a deep blue.

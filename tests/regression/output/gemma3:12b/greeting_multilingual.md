@@ -9,8 +9,8 @@
 
 Φυσικά! Να πώς λένε "καλημέρα" σε 5 διαφορετικές γλώσσες:
 
-1.  Αγγλικά: Good morning
-2.  Γαλλικά: Bonjour
-3.  Γερμανικά: Guten Morgen
-4.  Ισπανικά: Buenos días
-5.  Ιταλικά: Buongiorno
+1.  **Αγγλικά:** Good morning
+2.  **Γαλλικά:** Bonjour
+3.  **Γερμανικά:** Guten Morgen
+4.  **Ισπανικά:** Buenos días
+5.  **Ιταλικά:** Buongiorno

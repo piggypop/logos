@@ -14,20 +14,33 @@ def _client(host: str) -> "ol.Client":
 
 
 def stream_chat(
-    messages: list[dict], model: str, system_prompt: str, host: str, temperature: float
+    messages: list[dict],
+    model: str,
+    system_prompt: str,
+    host: str,
+    temperature: float,
+    num_ctx: int | None = None,
 ):
     """
     Generator that yields tokens as they arrive from Ollama
     (most models emit tokens at word / sub-word granularity).
+
+    ``num_ctx`` is the Ollama context-window size. When None, Ollama uses
+    its model default (often 2048), which causes intra-session amnesia in
+    long conversations. The chat endpoint always passes the config value
+    so the user can tune it from Settings.
     """
     full_messages = [{"role": "system", "content": system_prompt}] + messages
     # Streaming chat: long-running, use ollama's default (no read timeout).
     client = ol.Client(host=host)
+    options: dict = {"temperature": temperature}
+    if num_ctx is not None:
+        options["num_ctx"] = num_ctx
     for chunk in client.chat(
         model=model,
         messages=full_messages,
         stream=True,
-        options={"temperature": temperature},
+        options=options,
     ):
         text = chunk["message"]["content"]
         yield text

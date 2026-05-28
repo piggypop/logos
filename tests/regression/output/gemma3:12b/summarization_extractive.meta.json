@@ -9,9 +9,44 @@
       "offenders": []
     }
   },
-  "sources": [],
+  "sources": [
+    {
+      "title": "Is accuracy enough? trust and barriers to AI-based clinical decision support in clinical neurophysiology - PMC",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC13091461/",
+      "content": "... Key concerns: <strong>responsibility, overreliance, AI literacy, doctor–patient relationship</strong>. ... Respondents with high institutional trust, but low trust in commercial AI companies. Keywords: Artificial intelligence, Clinical decision support system, Trust, Attitudes"
+    },
+    {
+      "title": "Top 20 AI Challenges in 2026: Risks & Testing Impact",
+      "url": "https://www.testleaf.com/blog/top-20-challenges-of-artificial-intelligence-in-2026/",
+      "content": "The biggest AI challenges in 2026 include <strong>hallucination, bias, lack of explainability, model drift, data quality issues, regulatory compliance, and testing complexity in AI systems</strong>. ... Large language models still produce confident but incorrect responses. Even with retrieval-augmented ..."
+    },
+    {
+      "title": "Towards a Science of AI Agent Reliability",
+      "url": "https://arxiv.org/html/2602.16666v1",
+      "content": "AI agents are increasingly deployed to execute important tasks. While rising accuracy scores on standard benchmarks suggest rapid progress, many agents still continue to fail in practice. This discrepancy highlights a fundamental limitation of current evaluations: <strong>compressing agent behavior</strong> ..."
+    },
+    {
+      "title": "Can we trust academic AI detective? Accuracy and limitations of AI-output detectors - PMC",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12331776/",
+      "content": "AUC values are interpreted as follows: <strong>0.90–1.00 = excellent, 0.80–0.90 = good, 0.70–0.80 = fair, 0.60–0.70 = poor, and 0.50–0.60 = fail</strong>. In this context, the results of Corrector, Zero GPT and GPT Zero were found to be successful in predicting the probability that the texts written ..."
+    },
+    {
+      "title": "Companies Expand AI Health Offerings, Even as Accuracy Questions Remain — The Monitor | KFF",
+      "url": "https://www.kff.org/health-information-trust/companies-expand-ai-health-offerings-even-as-accuracy-questions-remain/",
+      "content": "Five technology companies have launched dedicated consumer-facing AI health tools so far in 2026, reflecting though questions about AI’s reliability remain. And a decades-old WHO classification has been misrepresented online to suggest that hormonal birth control pills were recently found to cause cancer."
+    }
+  ],
   "elapsed": 0.0,
   "sse_events": [
+    "searching",
+    "sources",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
     "token",
     "token",
     "token",

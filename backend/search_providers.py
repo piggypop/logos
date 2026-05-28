@@ -7,9 +7,45 @@ Selected via config key `search_provider`: 'ddg' (default) | 'brave' | 'searxng'
 All backends are fail-safe — return [] on any error.
 """
 
+import re
 import sys
 
 import httpx
+
+# Characters from scripts that should never appear in LLM-facing snippet content.
+# Brave (and other engines) occasionally return results from Cyrillic/Arabic/CJK
+# pages; those characters can bleed into model output even when LANGUAGE_RULE
+# forbids it.  Strip them at the data layer so they never reach the LLM (M13).
+_FOREIGN_SCRIPT_RE = re.compile(
+    r"["
+    r"Ѐ-ԯ"  # Cyrillic + Cyrillic Supplement
+    r"֐-׿"  # Hebrew
+    r"؀-ۿ"  # Arabic
+    r"܀-ݏ"  # Syriac
+    r"ऀ-ॿ"  # Devanagari
+    r"฀-๿"  # Thai
+    r"　-〿"  # CJK Symbols and Punctuation
+    r"぀-ヿ"  # Hiragana + Katakana
+    r"一-鿿"  # CJK Unified Ideographs
+    r"가-힯"  # Hangul Syllables
+    r"]+",
+    re.UNICODE,
+)
+
+
+def _clean_snippet(text: str) -> str:
+    """Strip foreign-script characters from a search result snippet (M13).
+
+    Cyrillic/Arabic/CJK characters in provider results can bleed into model
+    output even when LANGUAGE_RULE instructs otherwise.  Removing them at the
+    data layer is more reliable than relying solely on the prompt.
+    Title and URL fields are intentionally left untouched — only the content
+    field (which is injected verbatim into the LLM context) is cleaned.
+    """
+    if not text:
+        return text
+    cleaned = _FOREIGN_SCRIPT_RE.sub(" ", text)
+    return re.sub(r" {2,}", " ", cleaned).strip()
 
 
 def search(query: str, c: dict) -> list[dict]:
@@ -130,7 +166,7 @@ def format_as_context(results: list[dict]) -> str:
         return ""
     lines = ["Web search results:\n"]
     for i, r in enumerate(results, 1):
-        content = r.get("content", "")
+        content = _clean_snippet(r.get("content", "") or "")
         is_thin = len(content) < THIN_THRESHOLD
         tag = " [THIN — snippet only, no article body]" if is_thin else ""
         lines.append(f"[{i}] {r.get('title', '')}{tag}")

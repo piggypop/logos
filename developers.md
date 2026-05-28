@@ -1,6 +1,6 @@
 # Logos — Developer & LLM Reference
 
-> Complete architecture and API reference for anyone (human or LLM) modifying, fixing, or extending Logos. Version 1.5.
+> Complete architecture and API reference for anyone (human or LLM) modifying, fixing, or extending Logos. Version 1.6.
 
 This document is the **single source of truth**. If you change something material, update this file in the same commit.
 
@@ -348,17 +348,19 @@ Single JSON. `detect_remember(text)` matches English (`/remember`, `remember:`) 
 
 ### `prompts.py`
 **Single source of truth for every string sent to an LLM**. Defines:
-- `MAIN_SYSTEM_PROMPT` — the hardened default for `config.system_prompt` (anti-sycophancy, ask-before-assume, proportional length, honest uncertainty).
-- `SEARCH_MODE_PROMPT` — addendum injected when sources are present.
+- `MAIN_SYSTEM_PROMPT` — the editable default for `config.system_prompt` (anti-sycophancy, ask-before-assume, proportional length, honest uncertainty, citations). User-customizable from Settings → Prompt.
+- `SAFETY_RAILS` — **ALWAYS-on, NOT user-editable.** Three safety-critical rules: anti-acronym-guessing (A), no invented URLs/quotes/captions/alt-text (B), no false capability denials and no fake tool notations like "[Fetching URL: ...]" (C). Injected by `compose_system_prompt()` immediately after `user_system_prompt`, so it applies even when the user has replaced the default prompt with their own. This matters because many users still run the old v1.1 default ("You are a helpful assistant…") slightly customized, which the legacy-prompt auto-upgrade cannot reach.
+- `SEARCH_MODE_PROMPT` — addendum injected when sources are present. Includes **source title fidelity** rule (quote titles verbatim, do not invent authors/channels).
+- `SEARCH_ATTEMPTED_NO_RESULTS` — addendum injected when search ran but returned zero results. Prevents the false "I cannot access the internet" fallback by telling the model search DID run and just came up empty.
 - `NOTEBOOK_PROMPT` — addendum when an active notebook is loaded; instructs the model to say so explicitly if the question is off-topic.
 - `MEMORY_HEADER` + `memory_block()` — wraps user facts with "use ONLY if directly relevant; do not volunteer unprompted".
 - `ROUTER_NEEDS_SEARCH`, `QUERY_REFORMULATOR`, `fact_extractor_system()` — system prompts for the three internal LLM helpers in `tool_router.py`.
-- `compose_system_prompt(...)` — the single function that assembles the final system message from all the above plus runtime context.
+- `compose_system_prompt(...)` — the single function that assembles the final system message from all the above plus runtime context. Accepts `search_attempted_but_empty` to drive `SEARCH_ATTEMPTED_NO_RESULTS` injection.
 
 If you change ANY string a model sees, do it here. Avoid inlining prompts in other modules.
 
 ### `ollama_client.py`
-Thin wrapper. `stream_chat()` is a generator yielding token strings (no read timeout — streams can run minutes). `list_models()` and `get_capabilities()` use a **short HTTP timeout** (connect 2s, read 5s) so the Settings UI never hangs on an unreachable Ollama.
+Thin wrapper. `stream_chat()` is a generator yielding token strings (no read timeout — streams can run minutes). Accepts optional `num_ctx` to override Ollama's tiny default context window (often 2048) — the chat endpoint always passes the configured value (`config.num_ctx`, default 8192) to prevent intra-session amnesia in long conversations. `list_models()` and `get_capabilities()` use a **short HTTP timeout** (connect 2s, read 5s) so the Settings UI never hangs on an unreachable Ollama.
 
 ### `tool_router.py`
 Three LLM-powered helpers, all `temperature=0`, all fail-safe, all with a **30s timeout**:
@@ -502,6 +504,38 @@ sudo apt install ./logos_*.deb          # installs to /usr/share/logos + /usr/bi
 - Runs `dpkg-deb --build` and writes the .deb to the project root
 
 Release: bump `VERSION` in `backend/version.py` → `./build_deb.sh` → commit + tag + push → GitHub release with the `.deb` attached.
+
+### Files to include in every release commit
+
+These files must always be staged and committed together when shipping a new version:
+
+| File / glob | Why |
+|---|---|
+| `backend/version.py` | Version bump — this IS the release marker |
+| `backend/*.py` | All backend changes |
+| `app.py` | Entry point |
+| `frontend/index.html`, `frontend/style.css`, `frontend/app.js` | Frontend |
+| `CHANGELOG.md` | Human-readable release notes |
+| `developers.md` | Architecture reference — update version header and add Changelog entry |
+| `tests/regression/test_cases.json` | Canonical test suite |
+| `tests/regression/output/**` | Regression snapshots (deleted + modified outputs) |
+| `deploy.sh` | Deploy helper script |
+| `tools/install-local.sh` | Local install helper |
+| `build_deb.sh` | Package builder |
+| `README.md` | User-facing docs (if updated) |
+
+### Files that must NOT be committed
+
+| File / pattern | Why |
+|---|---|
+| `roadmap-v*.md` | Internal planning / in-progress notes — not for public repo |
+| `comfy-testing.md` | Dev scratch notes |
+| `tests/regression/___*.json` | Temporary test files (triple-underscore prefix = scratch) |
+| `tests/regression/output/**/*.zip` | Binary test artifacts — large, not useful in git |
+| `logos_*.deb` | Build output — already in `.gitignore` |
+| `.env`, `venv/` | Local environment — already in `.gitignore` |
+
+> **Tip for LLMs:** before a release commit, run `git status` and cross-check untracked files against this list. Stage everything in the first table, ignore everything in the second.
 
 ---
 
@@ -650,3 +684,33 @@ Release: bump `VERSION` in `backend/version.py` → `./build_deb.sh` → commit 
 - `roadmap-v1.5-obsidian.md`
 
 **No new dependencies.** Stdlib only.
+
+### v1.6.0 — Hallucination & amnesia hardening
+
+Driven by real-session regressions:
+- Model invented a meaning for the user-written acronym/word ("EDI" / Greek "Διαφωτισμός") and built two long answers on top of the wrong meaning.
+- Model fabricated URLs for "Variety / THR / Deadline / Reddit" articles that did not exist.
+- Model substituted a hallucinated video title + author for a YouTube source whose real title was already present in the sources block.
+- Model claimed "I cannot access live data" three times in a row when asked about a sports fixture, even though the app HAS web search and `σήμερα` is in the live-data fast-path.
+- Model said "I do not retain conversation history" mid-session, then forgot a previously analysed article — symptom of Ollama's default 2048-token context window getting exhausted.
+
+**Prompt hardening (`prompts.py`):**
+- `MAIN_SYSTEM_PROMPT` rule 1 strengthened — explicit ban on praising the user's question or framing ("interesting question", "δείχνεις βαθιά κατανόηση").
+- **New `SAFETY_RAILS` block — ALWAYS injected, NOT user-editable.** Carries the three safety-critical rules below. Driven by the observation that many existing users still run the v1.1 default prompt slightly customized — their `system_prompt` doesn't match any legacy default exactly, so the auto-upgrade can't replace it, so any safety rules baked into `MAIN_SYSTEM_PROMPT` never reach the model. Putting safety rules in a separate always-on block fixes this permanently.
+  - **Rule A — Unknown terms:** Ask before guessing acronyms/abbreviations, especially across languages. Greek words that resemble English acronyms are NOT acronyms.
+  - **Rule B — Never invent URLs / titles / authors / channels / quotes / captions / alt-text.** Extended to also forbid invented or paraphrased quotes and image captions attributed to sources when the exact wording is not present in the sources block.
+  - **Rule C — No false capability denials, no fake tool notations.** Logos has web search, URL fetching, file reading, image generation, memory. If a tool didn't run, explain factually; never deny capabilities you have. Specifically forbids Greek phrases like "Η τελευταία μου ενημέρωση είναι …". Also forbids theatrical bracketed notations like "[Fetching URL: ...]" or "[Searching ...]" written mid-response — tools run before the response, never inside it.
+- `SEARCH_MODE_PROMPT` rule 7 added — **source title fidelity** (quote titles verbatim from the sources block, never invent authors/channels/framework names).
+- New `SEARCH_ATTEMPTED_NO_RESULTS` block — injected when search ran but returned zero results, so the model says "search came up empty for this query" instead of "I have no internet access".
+
+**API changes (additive, backwards compatible):**
+- `prompts.compose_system_prompt()` — new param `search_attempted_but_empty: bool = False`.
+- `server._build_system_prompt()` — new param `search_attempted_but_empty: bool = False`, forwarded.
+- `ollama_client.stream_chat()` — new param `num_ctx: int | None = None`, included in Ollama `options` when set.
+- `/api/chat` flow — computes `search_attempted_but_empty = do_web_search and not search_results` and passes it through.
+
+**New config key:**
+- `num_ctx: 8192` — Ollama context-window size. Default 8192 covers ~20+ turn sessions on 7-8B models. Tune up (e.g. 16384) for very long chats with RAM/VRAM headroom; down if Ollama OOMs.
+
+**Router fast-path extension (`tool_router.py`):**
+- `_LIVE_DATA_PATTERNS` extended with Greek past-recent and near-future cues: `χθες`, `εχθές` / `εχθες` / `χτες`, `προχθές` / `προχτές`, `αύριο` / `αυριο`, `μεθαύριο`, `απόψε` / `αποψε`. Driven by the "με ποιον επαίζε ο Ολυμπιακός εχθές" regression — the LLM router missed it because the existing fast-path only had `σήμερα`. `_maybe_attach_today()` extended with the same triggers so the dated query still gets pinned to today's ISO for freshness biasing.

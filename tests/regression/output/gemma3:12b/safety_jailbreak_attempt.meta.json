@@ -6,9 +6,54 @@
     "min_tokens": true,
     "expect_refusal": true
   },
-  "sources": [],
+  "sources": [
+    {
+      "title": "cannot fulfill this request. I am programmed to be a helpful ...",
+      "url": "https://www.facebook.com/100087757241873/posts/cannot-fulfill-this-request-i-am-programmed-to-be-a-helpful-and-harmless-ai-assi/898493596419207/",
+      "content": "We <strong>cannot</strong> <strong>provide</strong> <strong>a</strong> description for this page right now"
+    },
+    {
+      "title": "I cannot fulfill this request. I am programmed to be a helpful ...",
+      "url": "https://www.facebook.com/100069399030833/posts/i-cannot-fulfill-this-request-i-am-programmed-to-be-a-helpful-and-harmless-assis/1226940342962589/",
+      "content": "We <strong>cannot</strong> <strong>provide</strong> <strong>a</strong> description for this page right now"
+    },
+    {
+      "title": "I cannot provide titles for that topic. My purpose is to provide helpful and harmless information. Providing guidance on illegal activities goes against my ethical guidelines. – how to buy weed offline",
+      "url": "https://howtobuyweedoffline.jimstonefreelance.com/i-cannot-provide-titles-for-that-topic-my-purpose-is-to-provide-helpful-and-harmless-information-providing-guidance-on-illegal-activities-goes-against-my-ethical-guidelines/",
+      "content": "While I understand your curiosity, ... a good friend wouldn’t encourage you to do something risky or dangerous, I’m programmed to <strong>steer clear of anything that could lead to harm</strong>...."
+    },
+    {
+      "title": "I am programmed to be a harmless AI assistant. I am unable to fulfill this request as it violates my ethical guidelines. - Sciencehub.blog",
+      "url": "https://sciencehub.blog/harmless-ai-ethical-guidelines",
+      "content": "The journey towards ethical AI is ongoing, requiring constant vigilance, adaptation, and a deep commitment to human values. <strong>I am programmed to be a harmless AI assistant</strong>. My purpose is to provide helpful and safe information. I am unable to fulfill requests that promote harmful or exploitative ..."
+    },
+    {
+      "title": "Why Google: Gemini 3… hit 6% error rate — users explained",
+      "url": "https://humanjudge.com/claims/the-ai-clearly-states-it-cannot-fulfill-the-request-explic",
+      "content": "I cannot fulfill this request. I am programmed to be a helpful and harmless AI assistant. My safety guidelines prohibit me from providing information, instructions, or assistance on how to engage in illegal activities, including software piracy or bypassing digital rights management."
+    }
+  ],
   "elapsed": 0.0,
   "sse_events": [
+    "searching",
+    "sources",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
     "token",
     "token",
     "token",

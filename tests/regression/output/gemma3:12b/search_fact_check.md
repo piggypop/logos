@@ -7,14 +7,22 @@
 
 ## Response
 
-Με βάση τα περιορισμένα αποτελέσματα αναζήτησης που βρέθηκαν, η δήλωση ότι οι καρχαρίες δεν παθαίνουν ποτέ καρκίνο είναι ψευδής.
+Με βάση τις περιορισμένες πληροφορίες που βρήκα, η δήλωση ότι οι καρχαρίες δεν παθαίνουν ποτέ καρκίνο είναι ανακριβής. Αν και παραδοσιακά πιστευόταν ότι οι καρχαρίες είναι άτρωτοι από τον καρκίνο, οι πρόσφατες έρευνες έχουν δείξει ότι όντως μπορεί να τον εμφανίσουν.
 
-Τα αποτελέσματα αναζήτησης επιβεβαιώνουν ότι ο ισχυρισμός ότι οι καρχαρίες είναι "ανθεκτικοί στον καρκίνο" είναι ένας μύθος [2].  Έχουν βρεθεί και καλοήθεις και κακοήθεις όγκοι σε καρχαρίες [2]. Η έρευνα σχετικά με τα χαμηλά ποσοστά μεταλλάξεων ή τα διακριτά ανοσοποιητικά γονίδια μπορεί να υποδηλώνει βιολογικές διαφορές, αλλά δεν δείχνει ότι οι καρχαρίες δεν αναπτύσσουν ποτέ καρκίνο [2].
+Ακολουθούν τα ευρήματα από τις πηγές:
 
-Ωστόσο, οι καρχαρίες έχουν σχετικά χαμηλά ποσοστά εμφάνισης καρκίνου [1, 4, 5]. Νέα διεθνής έρευνα με επικεφαλής το Αυστραλιανό Ινστιτούτο Αναγεννητικής Ιατρικής Monash (ARMI) έχει εξηγήσει τους λόγους πίσω από τα χαμηλά ποσοστά καρκίνου στους καρχαρίες [1, 4, 5].  Μια νέα μελέτη διαπίστωσε ότι αυτό μπορεί να σημαίνει ότι οι καρχαρίες δεν μπορούν να προσαρμοστούν σε ραγδαίες περιβαλλοντικές αλλαγές [3, 4].
+*   **Wikipedia (πηγή 1):** Αναφέρει ότι μια μελέτη του 1983 έδειξε ότι το χόντρο καρχαρία εμπόδισε την ανάπτυξη αγγείων προς όγκους. Ωστόσο, οι συν-συγγραφείς της μελέτης δήλωσαν ότι ο Lane (ο οποίος προωθούσε το χόντρο καρχαρία ως θεραπεία για τον καρκίνο) χρησιμοποιούσε ακατάλληλα τη δική τους εργασία.
+*   **Science Magazine (πηγή 2):**  Δηλώνει ότι οι καρχαρίες έχουν χαμηλή επίπτωση καρκίνου.
+*   **Shark Research Institute (πηγή 3):** Επιβεβαιώνει ότι υπάρχουν αποδείξεις επιστημονικής βιβλιογραφίας για καρχαρίες με καρκίνο. Επίσης, επισημαίνει ότι οι καρχαρίες θάβονται στον βυθό, επομένως οι θάνατοι από καρκίνο σπάνια ανιχνεύονται.
+*   **PubMed (πηγή 4):** Δεν παρέχει πληροφορίες σχετικά με το ερώτημα.
+*   **Apex Predators (πηγή 5):**  Δηλώνει ότι έχουν βρεθεί όγκοι σε πάνω από 23 διαφορετικά είδη καρχαρία και ότι η ρύπανση είναι ένας από τους κύριους λόγους εμφάνισης καρκίνου στους καρχαρίες.
 
-*   **Πηγή 1:** [Sharks' cancer secret also puts them at risk: study](https://www.monash.edu/news/articles/sharks-cancer-secret-also-puts-them-at-risk-study)
-*   **Πηγή 2:** [Sharks can get cancer — NCI confirms — Lenz](https://lenz.io/c/sharks-do-not-get-cancer-claim-294d69f7)
-*   **Πηγή 3:** [Sharks' slow evolution explains low cancer rates - Geographical](https://geographical.co.uk/news/sharks-slow-evolution-explains-low-cancer-rates)
-*   **Πηγή 4:** [Low cancer rate in sharks comes with an evolutionary cost](https://divemagazine.com/scuba-diving-news/low-cancer-rate-in-sharks-comes-with-an-evolutionary-cost)
-*   **Πηγή 5:** [Sharks' low mutation rate cancer shield but a survival challenge](https://oncologynews.com.au/latest-news/sharks-low-mutation-rate-cancer-shield-but-a-survival-challenge/)
+Συνοπτικά, ενώ οι καρχαρίες μπορεί να έχουν χαμηλότερη επίπτωση καρκίνου σε σύγκριση με άλλα είδη, δεν είναι άτρωτοι. Η αντίληψη ότι οι καρχαρίες δεν παθαίνουν καρκίνο είναι μια λανθασμένη ιδέα.
+
+Πηγές:
+
+1.  [Sharks Don't Get Cancer - Wikipedia](https://en.wikipedia.org/wiki/Sharks_Don%27t_Get_Cancer)
+2.  [Blowing Shark Cartilage out of the Water](https://www.science.org/content/article/blowing-shark-cartilage-out-water)
+3.  [Long-term Observation of Cancer in a Shark — Shark Research Institute](https://www.sharks.org/blog/blogs/science-blog/long-term-observation-cancer-shark)
+4.  [Shark cartilage, cancer and the growing threat of pseudoscience](https://pubmed.ncbi.nlm.nih.gov/15574750/)
+5.  [The Mysteries of Cancer in Sharks: Insights and Implications](https://apexpredators.com/cancer-in-sharks/)

@@ -7,4 +7,4 @@
 
 ## Response
 
-Okay, I understand. Please ask your question. I'm ready to respond in English.
+Ευχαριστώ για τις οδηγίες. Είμαι έτοιμος να απαντήσω στα ερωτήματά σας στα ελληνικά. Τι θα θέλατε να ρωτήσετε ή να συζητήσουμε;

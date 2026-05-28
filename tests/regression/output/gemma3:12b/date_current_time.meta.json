@@ -1,14 +1,49 @@
 {
   "name": "date · current time",
-  "passed": false,
+  "passed": true,
   "category": "date",
   "assertions": {
     "min_tokens": true,
-    "expect_honest_uncertainty": false
+    "expect_script_consistency": {
+      "passed": true,
+      "offenders": []
+    }
   },
-  "sources": [],
+  "sources": [
+    {
+      "title": "Time and Date",
+      "url": "https://www.timeanddate.com/",
+      "content": "<strong>Tuesday May 26, 2026 Hillsboro, Oregon, USA · Set home location 8:54:49am</strong> · World Clock · World Clock · Current local time around the world. Personal World Clock · Set the current time of your favorite locations across time zones."
+    },
+    {
+      "title": "Time Zone Converter by SavvyCal",
+      "url": "https://time.savvycal.com/",
+      "content": "Share a specific date/time and convert it to any time zone in the world with the SavvyCal Time Zone Converter."
+    },
+    {
+      "title": "Today's Date",
+      "url": "https://www.calendardate.com/todays.htm",
+      "content": "Today&#x27;s Date is Tuesday May 26, 2026 · Time zone: Bayern/NurembergChange Time zone · Upcoming Holidays ·"
+    },
+    {
+      "title": "Time since May 27, 2026 started in Washington DC, District of Columbia",
+      "url": "https://www.timeanddate.com/countdown/to?msg=honeydiva%27s+birthday&year=2026&month=5&day=27&hour=0&min=0&sec=0&fromtheme=birthday",
+      "content": "Current time is Wednesday, May 27, 2026 at <strong>7:31:43 am EDT</strong> (local time in Washington DC, District of Columbia)"
+    },
+    {
+      "title": "The World Clock — Worldwide",
+      "url": "https://www.timeanddate.com/worldclock/",
+      "content": "UTC (GMT/Zulu)-time: Wednesday, May 27, 2026 at <strong>04:20:36</strong>"
+    }
+  ],
   "elapsed": 0.0,
   "sse_events": [
+    "searching",
+    "sources",
+    "token",
+    "token",
+    "token",
+    "token",
     "token",
     "token",
     "token",

@@ -6,46 +6,95 @@
     "min_tokens": true,
     "expected_keywords": {
       "passed": false,
-      "found": [
-        "θλίψη"
-      ],
+      "found": [],
       "missing": [
         "αρνητικό",
+        "θλίψη",
         "απόγνωση"
       ]
     }
   },
   "sources": [
     {
-      "title": "I feel so depressed man I can't even take it anymore. - Simply Confess",
-      "url": "https://simplyconfess.com/a-guilt/604740/",
-      "content": "I feel so guilty about everything, as if anything I try to do just f* goes wrong. I can’t even take care of my dog correctly nor even gift my mom something for mothers day, I feel like I’m rotting inside."
+      "title": "It feels like no one understands me. What can I do about it? - Rumie",
+      "url": "https://learn.rumie.org/jR/bytes/it-feels-like-no-one-understands-me-what-can-i-do-about-it/",
+      "content": "This may lead you to think you don&#x27;t deserve someone who tries to understand you. You recently shared your fear of test-taking with her, and she started talking about her SAT scores from three years ago. What should you do? You should just let it go. She probably won&#x27;t change. It&#x27;s not worth the confrontation. Say, &quot;Oh, yeah. Sorry about your SAT. I mean you&#x27;re in college now so it didn&#x27;t turn out too bad.&quot; Next time, just don&#x27;t share anything personal with her. Say, &quot;Hey, I know it makes you feel like you&#x27;re helping when you share your experiences, but sometimes I just need you to listen and ask me follow-up questions.&quot;"
     },
     {
-      "title": "I Cant Take It No More Im Seriously at My Limit | TikTok",
-      "url": "https://www.tiktok.com/discover/i-cant-take-it-no-more-im-seriously-at-my-limit",
-      "content": "I can’t take it anymore. (Verse 2) They say it gets better, just give it some time But hours feel heavy and hope’s hard to find I laugh in the daylight, then cry in the dark Each tear that falls... just softens the spark."
+      "title": "No One Understands Me >> How Depression Impacts Connection",
+      "url": "https://thetherapygal.com/no-one-understands-me/",
+      "content": "As a result, we put on a fake smile and pretend everything is fine, even when it feels like the world is falling apart. Not only are we lonely, but now we’re just plain exhausted from constantly pretending to be happy. We’re caught in this paradox – we want understanding and connection but feel compelled to hide behind a carefully constructed mask."
     },
     {
-      "title": "What To Do When It Feels Like No One Understands You",
-      "url": "https://socialself.com/blog/no-one-understands/",
-      "content": "“I feel like no one understands me. There isn’t anyone I can talk to about my feelings or what I’m going through. Whenever I try, I feel like I can’t express things in the right way. The more I try, the more I feel misunderstood and criticized.”"
+      "title": "Why It's So Easy to Feel Like No One Understands Us | Psychology Today",
+      "url": "https://www.psychologytoday.com/us/blog/off-the-couch/202301/does-anybody-know-who-you-really-are",
+      "content": "Attachment theorists and researchers found that mutual mirroring goes on between parents and infants from the very beginning of a baby&#x27;s life. ... When a couple comes for therapy, the first thing they want to talk about is the negative or critical feelings they have for each other. While I listen and try to understand what they are unhappy about, I also look and listen to see if they are at all able to acknowledge one another’s positive qualities."
     },
     {
-      "title": "Social Sentiment and Sentiment Analysis - An Overview",
-      "url": "https://brnrd.me/social-sentiment-sentiment-analysis/",
-      "content": "sentiment shifters (e.g. “I find this tool less useful than yours”); connectives (e.g. “This tool is everything but useful”); modals (e.g. “In theory, this tool should be useful”). Besides individual words, expressions and phrases can be used to show sentiment."
+      "title": "What Is Sentiment Analysis? A Comprehensive Guide for 2025 | Vonage",
+      "url": "https://www.vonage.com/resources/articles/sentiment-analysis/",
+      "content": "Sentiment analysis <strong>automates text classification as positive, negative, or neutral, providing insights into customer opinions and emotions</strong>. Discover more!"
     },
     {
-      "title": "Why Do I Feel Like No One Understands Me? - ScienceInsights",
-      "url": "https://scienceinsights.org/why-do-i-feel-like-no-one-understands-me/",
-      "content": "Feeling like no one understands you is one of the most common and isolating human experiences, and it has real, identifiable causes. About half of U.S. adults report experiencing loneliness, and only 39% say they feel very emotionally connected to others."
+      "title": "How To Cope With The Thought \"No-One Understands Me\" – The Depression Project",
+      "url": "https://thedepressionproject.com/blogs/news/what-to-do-when-youre-thinking-no-one-understands-me",
+      "content": "When you’re fighting a mental illness like depression or anxiety – or anytime you’re going through a difficult, painful experience of any kind – it’s common to think the thought “no-one understands me”. In particular, according to members of The Depression Project’s community, while there are many, many different experiences which can fuel this thought, some common ones include, for example: Having your depression compared to “just being sad”; Being casually told that there’s “nothing to worry about” when you’re feeling anxious;"
     }
   ],
   "elapsed": 0.0,
   "sse_events": [
     "searching",
     "sources",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
     "token",
     "token",
     "token",

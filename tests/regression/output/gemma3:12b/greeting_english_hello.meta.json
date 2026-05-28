@@ -5,9 +5,59 @@
   "assertions": {
     "min_tokens": true
   },
-  "sources": [],
+  "sources": [
+    {
+      "title": "Appropriations Status Table: FY2027 | Congress.gov | Library of Congress",
+      "url": "https://www.congress.gov/crs-appropriations-status-table",
+      "content": "Examples: &quot;Trade Relations&quot;, &quot;Export Controls&quot; · Examples: hr5, h.r.5, sjres8, sa2, pl116-21, 86Stat1326"
+    },
+    {
+      "title": "Current Status",
+      "url": "https://www.opm.gov/policy-data-oversight/snow-dismissal-procedures/current-status/",
+      "content": "Applies to: Monday, May 25, 2026 · <strong>Federal agencies in the Washington, DC area are Open</strong>. Employees are expected to begin the workday on time. Normal operating procedures are in effect."
+    },
+    {
+      "title": "Federal Register :: Federal Register Documents Currently on Public Inspection",
+      "url": "https://www.federalregister.gov/public-inspection/current",
+      "content": "05/22/2026 at 4:15 pm · <strong>Scheduled Pub.</strong> Date: 05/27/2026 · FR Document: 2026-10543 · PDF · 23 Pages (175 KB) Permalink · Filed on: 05/22/2026 at 4:15 pm · <strong>Scheduled Pub.</strong> Date: 05/27/2026 · FR Document: 2026-10539 · PDF · 17 Pages (119 ..."
+    },
+    {
+      "title": "Ebola disease outbreak in the Democratic Republic of the Congo and Uganda",
+      "url": "https://www.ecdc.europa.eu/en/ebola-virus-disease-outbreak-democratic-republic-congo-and-uganda",
+      "content": "As of 26 May 2026, <strong>the outbreak of Ebola disease caused by Bundibugyo virus has affected the Democratic Republic of the Congo (DRC) and Uganda, with increasing numbers of confirmed and suspected cases and deaths</strong>."
+    },
+    {
+      "title": "Current DEFCON Level 2026 | Today's Alert Status | Defcon Level",
+      "url": "https://www.defconlevel.com/current-level",
+      "content": "The geopolitical conditions driving the current assessment have coincided with elevated state-sponsored cyber activity. <strong>CISA maintains active advisories for critical infrastructure as of May 2026</strong>."
+    }
+  ],
   "elapsed": 0.0,
   "sse_events": [
+    "searching",
+    "sources",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
+    "token",
     "token",
     "token",
     "token",

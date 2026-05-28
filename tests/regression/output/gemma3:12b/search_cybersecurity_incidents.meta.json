@@ -10,37 +10,35 @@
   },
   "sources": [
     {
-      "title": "Cyber Attack — Latest News, Reports & Analysis | The Hacker News",
-      "url": "https://thehackernews.com/search/label/Cyber+Attack",
-      "content": "4 weeks ago - Slovak cybersecurity company ESET said it observed the Gamaredon tools PteroGraphin and PteroOdd being used to execute Turla group's Kazuar backdoor on an endpoint in Ukraine in February 2025, indicating that Turla is very likely actively collaborating with Gamaredon to gain access to specific machines in Ukraine and deliver the Kazuar backdoor. \"PteroGraphin was used to restart the Kazuar v3 backdoor, possibly after it crashed or was not launched automatically,\" ESET said in a report shared with The Hacker News."
+      "title": "The Hacker News | #1 Trusted Source for Cybersecurity News",
+      "url": "https://thehackernews.com/",
+      "content": "<strong>A now-patched high-severity security flaw affecting Digital Knowledge</strong> KnowledgeDeliver , a Learning Management System (LMS) popular in Japan, was exploited as a zero-day to deliver the Godzilla web shell and ultimately facilitate the deployment ..."
     },
     {
-      "title": "Cyberattacks & Data Breaches recent news | Dark Reading",
-      "url": "https://www.darkreading.com/cyberattacks-data-breaches",
-      "content": "4 weeks ago - Cyberattacks & Data Breaches · Windows Zero-Day Barrage Continues After Patch TuesdayWindows Zero-Day Barrage Continues After Patch Tuesday · byJai Vijayan · May 19, 2026 · 6 Min Read · Vulnerabilities & Threats · Microsoft Exchange Zero-Day ..."
+      "title": "Cybersecurity News and Analysis | Cybersecurity Dive",
+      "url": "https://www.cybersecuritydive.com/",
+      "content": "As concerns mount about potential cyber sabotage by the Chinese government, the U.S. is warning operators to practice maintaining services in a degraded state. Updated May 5, 2026"
     },
     {
-      "title": "Cyber Security News Today - Latest Updates & Research - Cybernews",
-      "url": "https://cybernews.com/",
-      "content": "6 hours ago - Breaking cybersecurity and information news, independent research, latest tech analysis and product reviews all produced by Cybernews in-house experts."
+      "title": "Cybersecurity News, Insights and Analysis | SecurityWeek",
+      "url": "https://www.securityweek.com/",
+      "content": "<strong>Sites belonging to major universities such as Harvard and Oxford, as well as DuckDuckGo, have been compromised in the attack</strong>. (May 25, 2026) ... Catalin Dragomir previously pleaded guilty to selling access to an Oregon state government office’s ..."
     },
     {
-      "title": "BleepingComputer | Cybersecurity, Technology News and Support",
-      "url": "https://www.bleepingcomputer.com/",
-      "content": "Patch management isn't enough. See why privilege is defining security risk today."
+      "title": "Recent Cybersecurity Attacks and Data Breaches – 2026 | Intellizence",
+      "url": "https://intellizence.com/insights/business-signals-trends/major-cyber-attacks-data-breaches-leading-companies/",
+      "content": "Subscribe to Intellizence to get the latest data on which companies were targeted in major security &amp; data breaches, malware, ransomware, &amp; hacking incidents."
     },
     {
-      "title": "Cyberattack News - CBS News",
-      "url": "https://www.cbsnews.com/tag/cyberattack/",
-      "content": "April 11, 2026 - The war with Iran is raising cybersecurity concerns in the U.S. Vik Desai, global cybersecurity strategy lead at Accenture, joins CBS News to discuss. ... Hackers with ties to Iran have claimed responsibility for a cyberattack at Stryker, a medical device company based in the U.S."
+      "title": "2026: The Year of AI-Assisted Attacks",
+      "url": "https://thehackernews.com/2026/05/2026-year-of-ai-assisted-attacks.html",
+      "content": "In fact, Mandiant’s M-Trends 2026 report found that <strong>time-to-exploit has effectively gone negative</strong> — exploits are now routinely arriving before patches, with 28.3% of CVEs exploited within 24 hours of disclosure."
     }
   ],
   "elapsed": 0.0,
   "sse_events": [
     "searching",
     "sources",
-    "token",
-    "token",
     "token",
     "token",
     "token",

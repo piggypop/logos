@@ -37,6 +37,7 @@
                     >
                     <textarea id="img-negative" rows="2"></textarea>
                     <div id="img-progress" class="muted-note"></div>
+                    <img id="img-live-preview" class="hidden" alt="live preview" style="width:100%;border-radius:6px;margin-top:8px;image-rendering:auto;" />
                 </div>
                 <div class="settings-footer">
                     <button id="img-generate">Generate</button>
@@ -127,6 +128,23 @@
                             id="s-user-location"
                             placeholder="e.g., Athens, Greece"
                         />
+
+                        <label>Response Language</label>
+                        <select id="s-response-language">
+                            <option value="auto">Auto (detect from message)</option>
+                            <option value="English">English</option>
+                            <option value="Greek">Greek / Ελληνικά</option>
+                            <option value="Spanish">Spanish / Español</option>
+                            <option value="French">French / Français</option>
+                            <option value="German">German / Deutsch</option>
+                            <option value="Italian">Italian / Italiano</option>
+                            <option value="Portuguese">Portuguese / Português</option>
+                            <option value="Russian">Russian / Русский</option>
+                            <option value="Chinese">Chinese / 中文</option>
+                            <option value="Japanese">Japanese / 日本語</option>
+                            <option value="Arabic">Arabic / العربية</option>
+                        </select>
+                        <span class="muted-note">Forces replies in this language even when you paste a URL or image without text.</span>
                     </div>
 
                     <!-- Search tab -->
@@ -264,7 +282,13 @@
                         <label>Workflow</label>
                         <select id="s-comfyui-workflow">
                             <option value="sdxl-default">
-                                Default txt2img (SDXL / SD 1.5 / SD 2)
+                                txt2img — SDXL / SD 1.5 / SD 2 / Pony
+                            </option>
+                            <option value="flux-default">
+                                txt2img — Flux.1 (dev / schnell)
+                            </option>
+                            <option value="img2img-default">
+                                img2img — SDXL / SD 1.5 (attach image)
                             </option>
                             <option value="custom">
                                 Custom workflow (paste JSON)
@@ -275,10 +299,11 @@
                             <label
                                 >Custom workflow JSON
                                 <span class="muted-note"
-                                    >(API format · use {{PROMPT}},
+                                    >(API format · placeholders: {{PROMPT}},
                                     {{CHECKPOINT}}, {{SEED}}, {{STEPS}},
                                     {{WIDTH}}, {{HEIGHT}}, {{SAMPLER}},
-                                    {{SCHEDULER}}, {{CFG}}, {{NEGATIVE}})</span
+                                    {{SCHEDULER}}, {{CFG}}, {{NEGATIVE}},
+                                    {{GUIDANCE}}, {{DENOISE}}, {{INPUT_IMAGE}})</span
                                 >
                             </label>
                             <textarea
@@ -349,6 +374,50 @@
 
                         <label>Negative prompt</label>
                         <textarea id="s-comfyui-negative" rows="2"></textarea>
+
+                        <div class="row-two">
+                            <div>
+                                <label>Guidance <span class="muted-note">(Flux only)</span></label>
+                                <input
+                                    type="number"
+                                    id="s-comfyui-guidance"
+                                    min="0"
+                                    max="20"
+                                    step="0.5"
+                                    value="3.5"
+                                />
+                            </div>
+                            <div>
+                                <label>Denoise <span class="muted-note">(img2img)</span></label>
+                                <input
+                                    type="number"
+                                    id="s-comfyui-denoise"
+                                    min="0.01"
+                                    max="1.0"
+                                    step="0.05"
+                                    value="0.75"
+                                />
+                            </div>
+                        </div>
+
+                        <label>LoRA
+                            <span class="muted-note">(optional — applied on top of checkpoint)</span>
+                        </label>
+                        <div style="display:flex;gap:8px;align-items:center">
+                            <select id="s-comfyui-lora" style="flex:1">
+                                <option value="">— none —</option>
+                            </select>
+                        </div>
+                        <div class="row-two" id="s-lora-strength-wrap">
+                            <div>
+                                <label>LoRA model strength</label>
+                                <input type="number" id="s-comfyui-lora-sm" min="0" max="2" step="0.05" value="0.8" />
+                            </div>
+                            <div>
+                                <label>LoRA CLIP strength</label>
+                                <input type="number" id="s-comfyui-lora-sc" min="0" max="2" step="0.05" value="0.8" />
+                            </div>
+                        </div>
 
                         <label class="checkbox-label">
                             <input type="checkbox" id="s-comfyui-commentary" />
@@ -535,12 +604,12 @@
                         rows="1"
                     ></textarea>
                     <div id="input-buttons">
-                        <button id="btn-attach" title="Attach file">📎</button>
+                        <button id="btn-attach" title="Attach file">⇪</button>
                         <button id="btn-image" title="Generate image (ComfyUI)">
-                            🎨
+                            ✦
                         </button>
                         <button id="btn-search" title="Force web search">
-                            🔍
+                            ⌕
                         </button>
                         <button id="btn-send">Send</button>
                     </div>

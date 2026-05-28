@@ -34,9 +34,10 @@ from pathlib import Path
 import chats as chats_store
 import config as cfg
 
-# Legacy section header that predates this feature. When encountered we
-# rename it to the configured header so the user's daily notes converge.
-LEGACY_HEADER = "## About Aya"
+# Legacy section headers that predate this feature. When encountered we
+# rename them to the configured header so the user's daily notes converge.
+# Supports both plain and emoji-prefixed variants (e.g. "## 🤖 About Aya").
+LEGACY_HEADERS = ["## About Aya", "## 🤖 About Aya"]
 
 # Excerpt length for "excerpts" digest format. Greek characters are 2 bytes
 # in UTF-8 but ~1 visual char; this bound is in characters, not bytes.
@@ -232,13 +233,16 @@ def _update_section(file_path: Path, header: str, body: str) -> dict:
     text = file_path.read_text(encoding="utf-8")
     lines = text.splitlines(keepends=False)
 
-    # Legacy rename: if our header is absent AND "## About Aya" is present,
+    # Legacy rename: if our header is absent AND any legacy header is present,
     # rewrite the line in place. Only the heading text is changed; we then
     # treat that as the existing section to update.
     renamed = False
-    if header not in text and LEGACY_HEADER in text:
-        lines = [LEGACY_HEADER_SUB(line, header) for line in lines]
-        renamed = True
+    if header not in text:
+        for legacy in LEGACY_HEADERS:
+            if legacy in text:
+                lines = [LEGACY_HEADER_SUB(line, header, legacy) for line in lines]
+                renamed = True
+                break
 
     # Locate the section header line.
     header_idx = -1
@@ -293,23 +297,45 @@ def _update_section(file_path: Path, header: str, body: str) -> dict:
     }
 
 
-def LEGACY_HEADER_SUB(line: str, new_header: str) -> str:
-    """Substitute the legacy 'About Aya' header on one line (only).
-    Returns the line unchanged if it isn't the legacy header."""
-    if line.strip() == LEGACY_HEADER:
+def LEGACY_HEADER_SUB(line: str, new_header: str, legacy_header: str = None) -> str:
+    """Substitute a legacy header on one line (only).
+    Returns the line unchanged if it isn't the legacy header.
+    If legacy_header is None, tries all LEGACY_HEADERS."""
+    stripped = line.strip()
+    if legacy_header and stripped == legacy_header:
         # Preserve any leading whitespace (rare in markdown, but be safe).
         prefix_len = len(line) - len(line.lstrip())
         return line[:prefix_len] + new_header
+    if legacy_header is None:
+        for lh in LEGACY_HEADERS:
+            if stripped == lh:
+                prefix_len = len(line) - len(line.lstrip())
+                return line[:prefix_len] + new_header
     return line
 
 
 def _atomic_write(file_path: Path, text: str) -> None:
-    """Write text to file_path atomically: tmpfile + os.replace."""
+    """Write text to file_path atomically: tmpfile + os.replace.
+
+    Preserves the permissions of the existing file (so Obsidian's 0664
+    isn't clobbered by mkstemp's default 0600). For new files, uses
+    0644 — world-readable, matching the convention of daily-note plugins.
+    """
     file_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Determine target permissions: keep existing file's mode, or 0644 for new.
+    if file_path.exists():
+        target_mode = file_path.stat().st_mode & 0o7777
+    else:
+        target_mode = 0o644
+
     tmp_fd, tmp_path = tempfile.mkstemp(
         dir=str(file_path.parent), prefix=".obsidian_sync.", suffix=".tmp"
     )
     try:
+        # Set permissions on the temp file BEFORE writing, so os.replace()
+        # moves a file with the correct mode into place.
+        os.chmod(tmp_fd, target_mode)
         with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
             f.write(text)
         os.replace(tmp_path, file_path)
@@ -462,7 +488,31 @@ def _smoke_test() -> None:
         assert "## About Aya" in out and "legacy" in out
         assert "10:00 · One" in out  # new body written under About Logos
 
-        # 7. Template escape protection
+        # 7. Legacy rename with emoji prefix (## 🤖 About Aya)
+        f5 = td_path / "2026-05-27.md"
+        f5.write_text(
+            "# Day\n\n## 🤖 About Aya\n\nold body\n\n## Tasks\n\n- foo\n"
+        )
+        r = _update_section(f5, header, body_v1)
+        assert r["renamed_legacy_header"]
+        out = f5.read_text(encoding="utf-8")
+        assert "## 🤖 About Aya" not in out
+        assert "## About Aya" not in out
+        assert header in out
+        assert "## Tasks" in out and "- foo" in out
+
+        # 8. Coexisting emoji-legacy and new header — don't rename
+        f6 = td_path / "2026-05-28.md"
+        f6.write_text(
+            "## 🤖 About Aya\n\nlegacy\n\n## About Logos\n\nold logos body\n"
+        )
+        r = _update_section(f6, header, body_v1)
+        assert not r["renamed_legacy_header"]
+        out = f6.read_text(encoding="utf-8")
+        assert "## 🤖 About Aya" in out and "legacy" in out
+        assert "10:00 · One" in out
+
+        # 9. Template escape protection
         try:
             _resolve_daily_note_path(td_path, "../escape.md", date.today())
         except ValueError:

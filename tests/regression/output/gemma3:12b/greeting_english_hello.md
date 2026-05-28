@@ -7,4 +7,4 @@
 
 ## Response
 
-Hello! I'm doing well, thank you for asking. It's Friday, 22 May 2026, 19:48 here. How are you today?
+Γεια σου! Είμαι καλά, ευχαριστώ που ρώτησες! Σήμερα είναι Τετάρτη, 27 Μαΐου 2026, και η ώρα είναι 15:13. Εσύ πώς είσαι;
